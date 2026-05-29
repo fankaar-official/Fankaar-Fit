@@ -10,7 +10,7 @@ const shopify = shopifyApp({
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
   apiVersion: LATEST_API_VERSION,
   scopes: process.env.SCOPES?.split(","),
-  appUrl: process.env.SHOPIFY_APP_URL || process.env.HOST || "",
+  appUrl: process.env.SHOPIFY_APP_URL || "https://fankaar-fit.vercel.app",
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: "app_store",
