@@ -17,6 +17,7 @@ export default function App() {
           rel="stylesheet"
           href="https://unpkg.com/@shopify/polaris@latest/build/esm/styles.css"
         />
+        <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
         <Meta />
         <Links />
       </head>
