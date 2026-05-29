@@ -272,30 +272,66 @@ export default function ProductTryOnManager() {
       setUploadError(null);
 
       try {
-        // 1. Create form data for server upload
+        // Step 1: Get a staged upload URL from Shopify (tiny JSON request to our server)
+        setUploadProgress(5);
+        const urlRes = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            step: "get-upload-url",
+            filename: file.name,
+            fileSize: file.size,
+          }),
+        });
+        const urlData = await urlRes.json();
+        if (urlData.error) throw new Error(urlData.error);
+
+        // Step 2: Upload file DIRECTLY from browser to Shopify's CDN (bypasses Vercel)
+        setUploadProgress(10);
+        const { url: uploadUrl, resourceUrl, parameters } = urlData;
+
         const uploadForm = new FormData();
-        uploadForm.set("file", file);
-        uploadForm.set("variantId", variant.id);
-        uploadForm.set("filename", file.name);
+        for (const param of parameters) {
+          uploadForm.append(param.name, param.value);
+        }
+        uploadForm.append("file", file, file.name);
 
-        // Use XMLHttpRequest for progress tracking
-        const cdnUrl = await uploadWithProgress(uploadForm, (pct) =>
-          setUploadProgress(pct)
-        );
+        const cdnUrl = await uploadDirectToShopify(uploadUrl, uploadForm, (pct) => {
+          // Map 10-80% range for the actual upload
+          setUploadProgress(10 + Math.round(pct * 0.7));
+        });
 
-        // 2. Save CDN URL to variant metafield
+        // Step 3: Register the file in Shopify (tiny JSON request to our server)
+        setUploadProgress(85);
+        const regRes = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            step: "register-file",
+            filename: file.name,
+            resourceUrl,
+          }),
+        });
+        const regData = await regRes.json();
+        if (regData.error) throw new Error(regData.error);
+
+        setUploadProgress(90);
+
+        // Step 4: Save CDN URL to variant metafield
+        const finalUrl = regData.cdnUrl || resourceUrl;
         const metaForm = new FormData();
         metaForm.set("intent", "save-glb-url");
         metaForm.set("variantId", variant.id);
-        metaForm.set("glbUrl", cdnUrl);
+        metaForm.set("glbUrl", finalUrl);
         await fetcher.submit(metaForm, { method: "post" });
 
-        // 3. Update local state
+        // Update local state
         setVariants((prev) =>
           prev.map((v) =>
-            v.id === variant.id ? { ...v, glbUrl: cdnUrl } : v
+            v.id === variant.id ? { ...v, glbUrl: finalUrl } : v
           )
         );
+        setUploadProgress(100);
         setToast(`GLB uploaded for "${variant.title}"!`);
       } catch (err) {
         setUploadError(err.message || "Upload failed. Please try again.");
@@ -556,9 +592,9 @@ export default function ProductTryOnManager() {
   );
 }
 
-// ─── Upload helper with XHR progress ─────────────────────────────────────────
+// ─── Upload directly to Shopify's CDN with XHR progress ──────────────────────
 
-function uploadWithProgress(formData, onProgress) {
+function uploadDirectToShopify(url, formData, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.upload.addEventListener("progress", (e) => {
@@ -567,20 +603,15 @@ function uploadWithProgress(formData, onProgress) {
       }
     });
     xhr.addEventListener("load", () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const response = JSON.parse(xhr.responseText);
-          if (response.error) reject(new Error(response.error));
-          else resolve(response.cdnUrl);
-        } catch {
-          reject(new Error("Invalid server response"));
-        }
+      if (xhr.status >= 200 && xhr.status < 400) {
+        resolve(true);
       } else {
-        reject(new Error(`Upload failed: HTTP ${xhr.status}`));
+        reject(new Error(`Upload to Shopify failed: HTTP ${xhr.status}`));
       }
     });
-    xhr.addEventListener("error", () => reject(new Error("Network error during upload")));
-    xhr.open("POST", "/api/upload");
+    xhr.addEventListener("error", () => reject(new Error("Network error during upload to Shopify")));
+    xhr.open("POST", url);
     xhr.send(formData);
   });
 }
+
