@@ -1,0 +1,17 @@
+{
+  "functions": {
+    "build/server/**/*.mjs": {
+      "maxDuration": 30,
+      "memory": 1024
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/upload",
+      "methods": ["POST"],
+      "headers": {
+        "x-vercel-max-body-size": "50mb"
+      }
+    }
+  ]
+}
