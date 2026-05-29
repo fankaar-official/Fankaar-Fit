@@ -4,6 +4,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useRouteError,
 } from "@remix-run/react";
 export default function App() {
   return (
@@ -23,6 +24,21 @@ export default function App() {
         <Outlet />
         <ScrollRestoration />
         <Scripts />
+      </body>
+    </html>
+  );
+}
+
+export function ErrorBoundary() {
+  const error = useRouteError();
+  return (
+    <html>
+      <head>
+        <title>Error</title>
+      </head>
+      <body>
+        <h1>Root ErrorBoundary</h1>
+        <pre>{error instanceof Error ? error.stack : JSON.stringify(error)}</pre>
       </body>
     </html>
   );
