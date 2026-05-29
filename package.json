@@ -23,6 +23,7 @@
     "@remix-run/node": "^2.10.2",
     "@remix-run/react": "^2.10.2",
     "@remix-run/serve": "^2.10.2",
+    "@vercel/remix": "^2.10.2",
     "@shopify/app-bridge-react": "^4.1.6",
     "@shopify/polaris": "^13.8.0",
     "@shopify/shopify-app-remix": "^3.3.0",
