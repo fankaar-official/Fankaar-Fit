@@ -18,13 +18,14 @@ import { login } from "../shopify.server";
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }) => {
-  const loginErrors = await login(request);
-  return json({ errors: loginErrors || {}, polarisTranslations });
+  // If Token Exchange is enabled, login will just throw redirect to /oauth/install
+  const errors = await login(request);
+  return json({ errors: errors || {}, polarisTranslations });
 };
 
 export const action = async ({ request }) => {
-  const loginErrors = await login(request);
-  return json({ errors: loginErrors || {} });
+  const errors = await login(request);
+  return json({ errors: errors || {} });
 };
 
 export default function Auth() {
