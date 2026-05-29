@@ -1,0 +1,11 @@
+api_version = "2024-07"
+uid = "d94a1f83-6a7e-144f-96ab-050f601b511cf7de9f05"
+
+[[extensions]]
+name = "EyeLeux Try-On Block"
+handle = "eyeleux-tryon-block"
+type = "theme"
+
+  [extensions.targeting]
+  [[extensions.targeting.targets]]
+  target = "section/product/blocks/tryon"

@@ -1,0 +1,27 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "da9f77de29c8ebec484786b982ff5a78"
+application_url = "https://localhost:3000"
+embedded = true
+name = "Fankaar Fit: AR Glasses Try On"
+
+[build]
+include_config_on_deploy = true
+
+[access_scopes]
+scopes = "read_products,write_products,read_files,write_files"
+optional_scopes = []
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  "https://localhost/auth/callback",
+  "https://localhost/auth/shopify/callback",
+  "https://localhost/shopify/auth/callback"
+]
+
+[webhooks]
+api_version = "2026-04"
+
+[pos]
+embedded = false

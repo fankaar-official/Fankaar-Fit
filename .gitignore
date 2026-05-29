@@ -1,0 +1,9 @@
+node_modules
+.env
+.DS_Store
+*.log
+dev.db
+dev.db-journal
+.shopify
+build
+.cache

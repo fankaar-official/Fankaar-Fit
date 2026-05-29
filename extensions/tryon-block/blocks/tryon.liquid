@@ -1,0 +1,120 @@
+{% comment %}
+  EyeLeux Virtual Try-On Block
+  
+  Add this block to your product template in the Theme Editor.
+  It will show "3D View" and "Try-On" buttons for variants that have GLB files.
+  
+  Requirements:
+  - Product must have metafield: namespace="tryon", key="enabled", value="true"
+  - Current variant must have metafield: namespace="tryon", key="glb_url"
+{% endcomment %}
+
+{% assign tryon_enabled = product.metafields.tryon.enabled %}
+{% assign variant_glb_url = product.selected_or_first_available_variant.metafields.tryon.glb_url %}
+
+<div
+  id="eyeleux-tryon-container"
+  data-product-id="{{ product.id }}"
+  data-product-title="{{ product.title | escape }}"
+  data-variant-id="{{ product.selected_or_first_available_variant.id }}"
+  data-variant-title="{{ product.selected_or_first_available_variant.title | escape }}"
+  data-glb-url="{{ variant_glb_url }}"
+  data-tryon-enabled="{{ tryon_enabled }}"
+  style="margin-bottom: 16px;"
+>
+  {% if tryon_enabled == true and variant_glb_url != blank %}
+    <div id="eyeleux-buttons" style="display: flex; gap: 12px; flex-wrap: wrap;">
+      <button
+        id="eyeleux-3d-btn"
+        type="button"
+        aria-label="View in 3D"
+        style="
+          flex: 1;
+          min-width: 140px;
+          padding: 12px 20px;
+          border: 2px solid var(--color-button, #1a1a2e);
+          background: transparent;
+          color: var(--color-button, #1a1a2e);
+          border-radius: var(--buttons-radius, 4px);
+          font-family: var(--font-body-family, inherit);
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        "
+        onmouseover="this.style.background='var(--color-button,#1a1a2e)';this.style.color='var(--color-button-text,#fff)'"
+        onmouseout="this.style.background='transparent';this.style.color='var(--color-button,#1a1a2e)'"
+      >
+        <span aria-hidden="true">🕶</span> 3D View
+      </button>
+
+      <button
+        id="eyeleux-tryon-btn"
+        type="button"
+        aria-label="Try on virtually"
+        style="
+          flex: 1;
+          min-width: 140px;
+          padding: 12px 20px;
+          border: 2px solid var(--color-button, #1a1a2e);
+          background: var(--color-button, #1a1a2e);
+          color: var(--color-button-text, #fff);
+          border-radius: var(--buttons-radius, 4px);
+          font-family: var(--font-body-family, inherit);
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        "
+        onmouseover="this.style.opacity='0.85'"
+        onmouseout="this.style.opacity='1'"
+      >
+        <span aria-hidden="true">📷</span> Try-On
+      </button>
+    </div>
+  {% else %}
+    <div id="eyeleux-buttons" style="display: none;">
+      <button id="eyeleux-3d-btn" type="button" style="display:none">🕶 3D View</button>
+      <button id="eyeleux-tryon-btn" type="button" style="display:none">📷 Try-On</button>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+  // Store all variant GLB URLs for dynamic switching
+  window.__eyeleux = window.__eyeleux || {};
+  window.__eyeleux.variantGlbUrls = {
+    {% for variant in product.variants %}
+      "{{ variant.id }}": "{{ variant.metafields.tryon.glb_url | default: '' }}"{% unless forloop.last %},{% endunless %}
+    {% endfor %}
+  };
+  window.__eyeleux.tryonEnabled = {{ tryon_enabled | json }};
+  window.__eyeleux.productTitle = {{ product.title | json }};
+</script>
+
+<script>
+  window.__eyeleux = window.__eyeleux || {};
+  window.__eyeleux.arScriptUrl = {{ 'tryon-ar.js' | asset_url | json }};
+</script>
+<script src="{{ 'tryon-init.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "EyeLeux Try-On",
+  "target": "section",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Shows \"3D View\" and \"Try-On\" buttons for eyeglasses variants. Enable Try-On in the EyeLeux app and upload a GLB file for each variant."
+    }
+  ]
+}
+{% endschema %}

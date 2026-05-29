@@ -1,0 +1,51 @@
+{
+  "name": "eyeleux-tryon-app",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "remix vite:build",
+    "dev": "shopify app dev",
+    "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint .",
+    "setup": "prisma generate && prisma migrate deploy",
+    "config:use": "shopify app config use",
+    "config:link": "shopify app config link",
+    "generate": "shopify app generate",
+    "deploy": "shopify app deploy",
+    "shopify": "shopify",
+    "typecheck": "tsc"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=18.20.4"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.16.1",
+    "@remix-run/node": "^2.10.2",
+    "@remix-run/react": "^2.10.2",
+    "@remix-run/serve": "^2.10.2",
+    "@shopify/app-bridge-react": "^4.1.6",
+    "@shopify/polaris": "^13.8.0",
+    "@shopify/shopify-app-remix": "^3.3.0",
+    "@shopify/shopify-app-session-storage-prisma": "^5.1.4",
+    "isbot": "^4.4.0",
+    "prisma": "^5.16.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vite-tsconfig-paths": "^5.0.1"
+  },
+  "devDependencies": {
+    "@remix-run/dev": "^2.10.2",
+    "@shopify/api-codegen-preset": "^1.1.1",
+    "@types/node": "^20.14.14",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4",
+    "vite": "^5.3.5"
+  },
+  "workspaces": [
+    "extensions/*"
+  ]
+}

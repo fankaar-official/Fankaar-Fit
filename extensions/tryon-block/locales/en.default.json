@@ -1,0 +1,10 @@
+{
+  "blocks": {
+    "eyeleux_tryon": {
+      "name": "EyeLeux Try-On"
+    }
+  },
+  "settings": {
+    "paragraph": "Shows 3D View and Try-On buttons for eyeglasses variants. Enable Try-On in the EyeLeux app and upload a GLB file for each variant."
+  }
+}
