@@ -31,25 +31,27 @@
         style="
           flex: 1;
           min-width: 140px;
-          padding: 12px 20px;
-          border: 2px solid var(--color-button, #1a1a2e);
+          padding: 12px 24px;
+          border: 1.5px solid #1a1a1a;
           background: transparent;
-          color: var(--color-button, #1a1a2e);
-          border-radius: var(--buttons-radius, 4px);
+          color: #1a1a1a;
+          border-radius: 999px;
           font-family: var(--font-body-family, inherit);
           font-size: 14px;
           font-weight: 600;
           cursor: pointer;
-          transition: all 0.2s ease;
+          transition: all 0.25s ease;
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 8px;
+          letter-spacing: 0.02em;
         "
-        onmouseover="this.style.background='var(--color-button,#1a1a2e)';this.style.color='var(--color-button-text,#fff)'"
-        onmouseout="this.style.background='transparent';this.style.color='var(--color-button,#1a1a2e)'"
+        onmouseover="this.style.background='#1a1a1a';this.style.color='#fff'"
+        onmouseout="this.style.background='transparent';this.style.color='#1a1a1a'"
       >
-        <span aria-hidden="true">🕶</span> 3D View
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15.194 13.707 3.814 1.86-1.86 3.814"/><path d="M16.47214 7.52786 A 5 10 0 1 0 13 21.79796"/><path d="M21.79796 11 A 10 5 0 1 0 19 15.57071"/></svg>
+        3D View
       </button>
 
       <button
@@ -59,45 +61,67 @@
         style="
           flex: 1;
           min-width: 140px;
-          padding: 12px 20px;
-          border: 2px solid var(--color-button, #1a1a2e);
-          background: var(--color-button, #1a1a2e);
-          color: var(--color-button-text, #fff);
-          border-radius: var(--buttons-radius, 4px);
+          padding: 12px 24px;
+          border: 1.5px solid #1a1a1a;
+          background: transparent;
+          color: #1a1a1a;
+          border-radius: 999px;
           font-family: var(--font-body-family, inherit);
           font-size: 14px;
           font-weight: 600;
           cursor: pointer;
-          transition: all 0.2s ease;
+          transition: all 0.25s ease;
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 8px;
+          letter-spacing: 0.02em;
         "
-        onmouseover="this.style.opacity='0.85'"
-        onmouseout="this.style.opacity='1'"
+        onmouseover="this.style.background='#1a1a1a';this.style.color='#fff'"
+        onmouseout="this.style.background='transparent';this.style.color='#1a1a1a'"
       >
-        <span aria-hidden="true">📷</span> Try-On
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="15" r="4"/><circle cx="18" cy="15" r="4"/><path d="M14 15a2 2 0 0 0-2-2 2 2 0 0 0-2 2"/><path d="M2.5 13 5 7c.7-1.3 1.4-2 3-2"/><path d="M21.5 13 19 7c-.7-1.3-1.5-2-3-2"/></svg>
+        Try-On
       </button>
     </div>
   {% else %}
     <div id="eyeleux-buttons" style="display: none;">
-      <button id="eyeleux-3d-btn" type="button" style="display:none">🕶 3D View</button>
-      <button id="eyeleux-tryon-btn" type="button" style="display:none">📷 Try-On</button>
+      <button id="eyeleux-3d-btn" type="button" style="display:none">3D View</button>
+      <button id="eyeleux-tryon-btn" type="button" style="display:none">Try-On</button>
     </div>
   {% endif %}
 </div>
 
 <script>
-  // Store all variant GLB URLs for dynamic switching
+  // Store all variant GLB URLs and data for dynamic switching + carousel
   window.__eyeleux = window.__eyeleux || {};
   window.__eyeleux.variantGlbUrls = {
     {% for variant in product.variants %}
       "{{ variant.id }}": "{{ variant.metafields.tryon.glb_url | default: '' }}"{% unless forloop.last %},{% endunless %}
     {% endfor %}
   };
+  window.__eyeleux.variants = [
+    {% for variant in product.variants %}
+      {
+        "id": "{{ variant.id }}",
+        "title": {{ variant.title | json }},
+        "image": "{{ variant.featured_image.src | image_url: width: 100 | default: '' }}",
+        "glbUrl": "{{ variant.metafields.tryon.glb_url | default: '' }}"
+      }{% unless forloop.last %},{% endunless %}
+    {% endfor %}
+  ];
   window.__eyeleux.tryonEnabled = {{ tryon_enabled | json }};
   window.__eyeleux.productTitle = {{ product.title | json }};
+</script>
+
+<!-- Import map so Three.js ESM modules resolve correctly -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/"
+  }
+}
 </script>
 
 <script>
