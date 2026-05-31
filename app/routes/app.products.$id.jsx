@@ -134,88 +134,132 @@ export const loader = async ({ request, params }) => {
 // ─── Action ───────────────────────────────────────────────────────────────────
 
 export const action = async ({ request, params }) => {
-  const { admin } = await authenticate.admin(request);
-  const formData = await request.formData();
-  const intent = formData.get("intent");
+  try {
+    const { admin } = await authenticate.admin(request);
+    const formData = await request.formData();
+    const intent = formData.get("intent");
 
-  if (intent === "save-enabled") {
-    const enabled = formData.get("enabled") === "true";
-    const productId = `gid://shopify/Product/${params.id}`;
-    const metafieldId = formData.get("metafieldId") || null;
+    if (intent === "save-enabled") {
+      const enabled = formData.get("enabled") === "true";
+      const productId = `gid://shopify/Product/${params.id}`;
+      const metafieldId = formData.get("metafieldId") || null;
 
-    if (!enabled && metafieldId) {
-      // Delete the metafield to disable
-      const res = await admin.graphql(DELETE_METAFIELD_MUTATION, {
-        variables: { input: { id: metafieldId } },
-      });
-      const data = await res.json();
-      if (data.data?.metafieldDelete?.userErrors?.length) {
-        return json({ error: data.data.metafieldDelete.userErrors[0].message });
+      if (!enabled && metafieldId) {
+        try {
+          const res = await admin.graphql(DELETE_METAFIELD_MUTATION, {
+            variables: { input: { id: metafieldId } },
+          });
+          const data = await res.json();
+          if (data.data?.metafieldDelete?.userErrors?.length) {
+            return json({ error: data.data.metafieldDelete.userErrors[0].message });
+          }
+        } catch (gqlErr) {
+          console.error("[Action] delete enabled metafield error:", gqlErr);
+          return json({ error: "Failed to disable try-on. Please try again." });
+        }
+        return json({ success: true });
       }
-      return json({ success: true });
-    }
 
-    if (enabled) {
-      const res = await admin.graphql(SET_METAFIELD_MUTATION, {
-        variables: {
-          metafields: [
-            {
-              ownerId: productId,
-              namespace: "tryon",
-              key: "enabled",
-              type: "boolean",
-              value: "true",
+      if (enabled) {
+        try {
+          const res = await admin.graphql(SET_METAFIELD_MUTATION, {
+            variables: {
+              metafields: [
+                {
+                  ownerId: productId,
+                  namespace: "tryon",
+                  key: "enabled",
+                  type: "boolean",
+                  value: "true",
+                },
+              ],
             },
-          ],
-        },
-      });
-      const data = await res.json();
-      if (data.data?.metafieldsSet?.userErrors?.length) {
-        return json({ error: data.data.metafieldsSet.userErrors[0].message });
+          });
+          const data = await res.json();
+          if (data.data?.metafieldsSet?.userErrors?.length) {
+            return json({ error: data.data.metafieldsSet.userErrors[0].message });
+          }
+        } catch (gqlErr) {
+          console.error("[Action] set enabled metafield error:", gqlErr);
+          return json({ error: "Failed to enable try-on. Please try again." });
+        }
+        return json({ success: true });
+      }
+
+      return json({ success: true });
+    }
+
+    if (intent === "save-glb-url") {
+      const variantId = formData.get("variantId");
+      const glbUrl = formData.get("glbUrl");
+
+      if (!variantId || !glbUrl) {
+        return json({ error: "Missing variantId or glbUrl" }, { status: 400 });
+      }
+
+      try {
+        const res = await admin.graphql(SET_METAFIELD_MUTATION, {
+          variables: {
+            metafields: [
+              {
+                ownerId: variantId,
+                namespace: "tryon",
+                key: "glb_url",
+                type: "url",
+                value: glbUrl,
+              },
+            ],
+          },
+        });
+        const data = await res.json();
+        if (data.data?.metafieldsSet?.userErrors?.length) {
+          return json({ error: data.data.metafieldsSet.userErrors[0].message });
+        }
+      } catch (gqlErr) {
+        console.error("[Action] save-glb-url error:", gqlErr);
+        return json({ error: "Failed to save GLB URL. Please try again." });
       }
       return json({ success: true });
     }
 
-    return json({ success: true });
-  }
+    if (intent === "remove-glb") {
+      const metafieldId = formData.get("metafieldId");
 
-  if (intent === "save-glb-url") {
-    const variantId = formData.get("variantId");
-    const glbUrl = formData.get("glbUrl");
+      if (!metafieldId) {
+        // No metafield to delete — just return success
+        return json({ success: true });
+      }
 
-    const res = await admin.graphql(SET_METAFIELD_MUTATION, {
-      variables: {
-        metafields: [
-          {
-            ownerId: variantId,
-            namespace: "tryon",
-            key: "glb_url",
-            type: "url",
-            value: glbUrl,
-          },
-        ],
-      },
-    });
-    const data = await res.json();
-    if (data.data?.metafieldsSet?.userErrors?.length) {
-      return json({ error: data.data.metafieldsSet.userErrors[0].message });
+      try {
+        const res = await admin.graphql(DELETE_METAFIELD_MUTATION, {
+          variables: { input: { id: metafieldId } },
+        });
+        const data = await res.json();
+        if (data.data?.metafieldDelete?.userErrors?.length) {
+          const errMsg = data.data.metafieldDelete.userErrors[0].message;
+          console.error("[Action] remove-glb userError:", errMsg);
+          // If "not found" just treat as success (already deleted)
+          if (errMsg.toLowerCase().includes("not found")) {
+            return json({ success: true });
+          }
+          return json({ error: errMsg });
+        }
+      } catch (gqlErr) {
+        console.error("[Action] remove-glb error:", gqlErr);
+        // If it's a "not found" error, treat as already removed
+        if (gqlErr.message?.toLowerCase().includes("not found")) {
+          return json({ success: true });
+        }
+        return json({ error: "Failed to remove GLB. Please try again." });
+      }
+      return json({ success: true });
     }
-    return json({ success: true });
-  }
 
-  if (intent === "remove-glb") {
-    const metafieldId = formData.get("metafieldId");
-    const res = await admin.graphql(DELETE_METAFIELD_MUTATION, {
-      variables: { input: { id: metafieldId } },
-    });
-    const data = await res.json();
-    if (data.data?.metafieldDelete?.userErrors?.length) {
-      return json({ error: data.data.metafieldDelete.userErrors[0].message });
-    }
-    return json({ success: true });
+    return json({ error: "Unknown action" });
+  } catch (topErr) {
+    console.error("[Action] Top-level error:", topErr);
+    return json({ error: topErr.message || "Unexpected server error" }, { status: 500 });
   }
-
-  return json({ error: "Unknown action" });
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -606,7 +650,10 @@ function uploadDirectToShopify(url, formData, onProgress) {
       if (xhr.status >= 200 && xhr.status < 400) {
         resolve(true);
       } else {
-        reject(new Error(`Upload to Shopify failed: HTTP ${xhr.status}`));
+        // Include response body for debugging HTTP 400 errors
+        const body = xhr.responseText?.substring(0, 200) || "";
+        console.error(`[Upload] HTTP ${xhr.status} response:`, body);
+        reject(new Error(`Upload to Shopify failed: HTTP ${xhr.status}. ${body}`));
       }
     });
     xhr.addEventListener("error", () => reject(new Error("Network error during upload to Shopify")));

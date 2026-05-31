@@ -19,21 +19,9 @@
     THREE: 'https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js',
     GLTF_LOADER: 'https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/loaders/GLTFLoader.js',
     ROOM_ENV: 'https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/environments/RoomEnvironment.js',
-    MEDIAPIPE_VISION: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/vision_bundle.js',
+    MEDIAPIPE_VISION: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/vision_bundle.mjs',
     MEDIAPIPE_WASM: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/wasm',
     FACE_LANDMARKER_MODEL: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
-  };
-
-  // ─── Face landmark indices ─────────────────────────────────────────────────
-  const LM = {
-    NOSE_BRIDGE_TOP:  168,
-    NOSE_BRIDGE_MID:    6,
-    LEFT_FACE_EDGE:   234,
-    RIGHT_FACE_EDGE:  454,
-    LEFT_EYE_CENTER:   33,
-    RIGHT_EYE_CENTER: 263,
-    FOREHEAD_CENTER:    9,
-    CHIN:             152,
   };
 
   // ─── Module state ──────────────────────────────────────────────────────────
@@ -56,7 +44,6 @@
   let calibrationFactor = 1.8;
   let isMirrored = true;
   let lastFaceDetectedTime = 0;
-  let noFaceTimer = null;
 
   let callbacks = {
     onReady: null,
@@ -66,17 +53,11 @@
   };
 
   // ─── Dynamic ES module import helper ──────────────────────────────────────
-  // We use a script-tag + global approach because Shopify themes may not
-  // support top-level await or native ES module imports in all contexts.
-  // We load THREE as ESM via a dynamic import shim.
-  
   let threePromise = null;
   let mediapipePromise = null;
 
   function loadESModule(url) {
     return new Promise((resolve, reject) => {
-      // Use Function constructor to call dynamic import without triggering
-      // Babel/bundler transforms (works in modern browsers natively).
       const fn = new Function('url', 'return import(url)');
       fn(url).then(resolve).catch(reject);
     });
@@ -99,38 +80,14 @@
 
   async function loadMediaPipe() {
     if (mediapipePromise) return mediapipePromise;
-    mediapipePromise = new Promise((resolve, reject) => {
-      if (global.FaceLandmarker && global.FilesetResolver) {
-        FaceLandmarker = global.FaceLandmarker;
-        FilesetResolver = global.FilesetResolver;
-        resolve();
-        return;
+    mediapipePromise = (async () => {
+      const mpVision = await loadESModule(CDN.MEDIAPIPE_VISION);
+      FaceLandmarker = mpVision.FaceLandmarker;
+      FilesetResolver = mpVision.FilesetResolver;
+      if (!FaceLandmarker || !FilesetResolver) {
+        throw new Error('MediaPipe modules not found in ES module export');
       }
-
-      const script = document.createElement('script');
-      script.src = CDN.MEDIAPIPE_VISION;
-      script.onload = () => {
-        // MediaPipe exposes globals after load
-        // Access via the vision_bundle globals
-        if (global.FaceLandmarker) {
-          FaceLandmarker = global.FaceLandmarker;
-          FilesetResolver = global.FilesetResolver;
-          resolve();
-        } else {
-          // Try namespace
-          const mp = global.mediapipe || global.mpVision;
-          if (mp?.FaceLandmarker) {
-            FaceLandmarker = mp.FaceLandmarker;
-            FilesetResolver = mp.FilesetResolver;
-            resolve();
-          } else {
-            reject(new Error('MediaPipe FaceLandmarker not found after script load'));
-          }
-        }
-      };
-      script.onerror = () => reject(new Error('Failed to load MediaPipe'));
-      document.head.appendChild(script);
-    });
+    })();
     return mediapipePromise;
   }
 
@@ -162,7 +119,6 @@
 
   // ─── Three.js scene setup ───────────────────────────────────────────────────
   function setupThreeScene() {
-    // Renderer with transparent background (overlaid on camera canvas)
     renderer = new THREE.WebGLRenderer({
       canvas: threeCanvas,
       alpha: true,
@@ -174,22 +130,22 @@
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
-    renderer.shadowMap.enabled = false; // Disable for performance
+    renderer.shadowMap.enabled = false;
 
-    // Orthographic camera for 2D overlay mapping
-    // We update this on resize to match the aspect ratio
     const W = threeCanvas.offsetWidth || window.innerWidth;
     const H = threeCanvas.offsetHeight || window.innerHeight;
     const aspect = W / H;
 
-    camera = new THREE.OrthographicCamera(
-      -aspect, aspect, 1, -1, 0.01, 100
-    );
-    camera.position.z = 10;
+    // Orthographic camera: world units = screen pixels.
+    // This gives pixel-perfect 2D positioning of the 3D glasses model
+    // on top of the 2D video feed, with no perspective distortion.
+    // Camera at z=10000 with very large near/far to prevent clipping:
+    // the scaled 3D model extends hundreds of pixels in Z-depth.
+    camera = new THREE.OrthographicCamera(-W / 2, W / 2, H / 2, -H / 2, 1, 20000);
+    camera.position.z = 10000;
 
     scene = new THREE.Scene();
 
-    // Lighting for PBR metallic materials
     ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
@@ -201,7 +157,6 @@
     dirLight2.position.set(-0.5, -0.5, 0.5);
     scene.add(dirLight2);
 
-    // Environment map for metallic reflections (PMREMGenerator)
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     pmremGenerator.compileEquirectangularShader();
     const envTexture = pmremGenerator.fromScene(new RoomEnvironment()).texture;
@@ -235,14 +190,39 @@
             }
           });
 
-          // Center the model at origin
+          // This GLB's lenses face -Z (Blender export convention).
+          // Rotate 180° around Y so lenses face +Z (toward camera).
+          glasses.rotation.y = Math.PI;
+
+          // CRITICAL: force-update the world matrix so Box3.setFromObject sees
+          // the post-rotation extents, not the stale pre-rotation state.
+          glasses.updateMatrixWorld(true);
+
+          // Compute bounding box in post-rotation world space.
+          // After rotation.y = PI:  box.max.z = lens surface (toward camera)
+          //                         box.min.z = temple tips (into head)
           const box = new THREE.Box3().setFromObject(glasses);
           const center = box.getCenter(new THREE.Vector3());
-          glasses.position.sub(center);
+          const naturalWidth = box.max.x - box.min.x;
+          const naturalDepth = box.max.z - box.min.z;
 
-          scene.add(glasses);
-          glassesModel = glasses;
-          resolve(glasses);
+          // ─── Respect the model's origin ───────────────────────────────────
+          // The GLB origin has been set at the NOSE BRIDGE in Blender.
+          // Do NOT re-center — keep glasses.position at (0,0,0) so the
+          // wrapper origin = model origin = nose bridge pivot point.
+          // Lenses extend forward (+Z after rotation), temples extend
+          // backward (-Z) — exactly like real glasses on a face.
+          // glasses.position stays at (0,0,0)
+
+          // Wrap in a Group whose origin = model nose bridge
+          const wrapper = new THREE.Group();
+          wrapper.add(glasses);
+
+          wrapper.userData.naturalWidth = naturalWidth;
+
+          scene.add(wrapper);
+          glassesModel = wrapper;
+          resolve(wrapper);
         },
         undefined,
         (error) => reject(error)
@@ -254,7 +234,6 @@
     if (!mat) return;
     mat.envMapIntensity = 1.0;
     mat.needsUpdate = true;
-    // Ensure transparency is handled correctly for lens materials
     if (mat.transparent) {
       mat.depthWrite = false;
     }
@@ -270,59 +249,103 @@
         delegate: 'GPU',
       },
       outputFaceBlendshapes: false,
+      outputFacialTransformationMatrixes: false,  // Not needed with landmark approach
       runningMode: 'VIDEO',
       numFaces: 1,
     });
   }
 
   // ─── Glasses transform update ───────────────────────────────────────────────
+  //
+  // APPROACH: Landmark-based rotation (no MediaPipe face matrix needed).
+  //
+  // We convert key face landmarks from MediaPipe's image-normalized coordinates
+  // (Y-down, [0,1]) to Three.js world coordinates (Y-up), then build the face's
+  // three orthonormal axes:
+  //
+  //   X axis  = left-eye → right-eye          (face horizontal)
+  //   Y axis  = chin → forehead               (face vertical / "up")
+  //   Z axis  = X × Y (cross product)         (face normal, toward camera)
+  //
+  // A rotation matrix built from these axes correctly orients the glasses to
+  // sit on the face regardless of head pose (yaw, pitch, roll), with no
+  // coordinate-system conversion ambiguity.
+  // ──────────────────────────────────────────────────────────────────────────
   function updateGlassesTransform(landmarks) {
     if (!glassesModel || !landmarks || !landmarks.length) return;
 
     const lm = landmarks;
-    const noseBridge = lm[LM.NOSE_BRIDGE_TOP];
-    const leftEdge   = lm[LM.LEFT_FACE_EDGE];
-    const rightEdge  = lm[LM.RIGHT_FACE_EDGE];
-    const leftEye    = lm[LM.LEFT_EYE_CENTER];
-    const rightEye   = lm[LM.RIGHT_EYE_CENTER];
 
-    // Face width in normalized units (0-1)
-    const faceWidthNorm = Math.abs(rightEdge.x - leftEdge.x);
+    // Visible world dimensions = camera frustum size (orthographic: 1 unit = 1 pixel)
+    const visWidth  = camera.right - camera.left;
+    const visHeight = camera.top - camera.bottom;
 
-    // Midpoint between eyes for position
-    const eyeMidX = (leftEye.x + rightEye.x) / 2;
-    const eyeMidY = (leftEye.y + rightEye.y) / 2;
+    // ── Convert MediaPipe landmark → Three.js world space ──────────────────
+    // MediaPipe: x,y in [0,1] image-normalized (Y-down), z = depth (rough scale)
+    // Three.js:  Y-up, camera at z=+2 looking in -Z direction
+    // Mirroring: when isMirrored=true (selfie cam), flip X so real-world left
+    //            stays on the left in the Three.js scene.
+    const toW = (p) => new THREE.Vector3(
+      ((isMirrored ? 1 - p.x : p.x) - 0.5) * visWidth,
+      -(p.y - 0.5) * visHeight,
+      -(p.z * visWidth)
+    );
 
-    // ── Convert to Three.js NDC coords ──────────────────────────────────────
-    // MediaPipe coords: 0,0 = top-left, 1,1 = bottom-right
-    // Three.js ortho coords: depends on camera left/right/top/bottom
-    // We mirror X because video is flipped: posX = (1 - x) * 2 - 1  (range -1..1)
+    // Key landmarks
+    const leftEyeW  = toW(lm[33]);   // left eye outer corner  (for rotation axis)
+    const rightEyeW = toW(lm[263]);  // right eye outer corner (for rotation axis)
+    const chinW     = toW(lm[152]);  // chin
+    const foreW     = toW(lm[9]);    // forehead
 
-    const aspect = camera.right;  // camera.right = aspect in our setup
+    // Iris/pupil centers — the most accurate landmarks for lens placement
+    // lm[468] = left iris center, lm[473] = right iris center (MediaPipe 478-pt model)
+    const leftIrisW  = toW(lm[468]);
+    const rightIrisW = toW(lm[473]);
 
-    const posX = isMirrored
-      ? ((1 - eyeMidX) * 2 - 1) * aspect
-      : (eyeMidX * 2 - 1) * aspect;
+    // Nose bridge landmarks:
+    // lm[168] = between inner eye corners (top of nose bridge)
+    // lm[6]   = lower nose bridge, where glasses nose pads actually rest
+    const nosePadW = toW(lm[6]);
 
-    const posY = -(eyeMidY * 2 - 1); // Flip Y
+    // ── Scale ────────────────────────────────────────────────────────────────
+    // Frame width ≈ 2.1 × interpupillary distance (IPD-based).
+    const pupilDist = leftIrisW.distanceTo(rightIrisW);
+    let S = 1;
+    if (glassesModel.userData.naturalWidth > 0) {
+      S = (pupilDist * 2.1) / glassesModel.userData.naturalWidth;
+      glassesModel.scale.setScalar(S);
+    }
 
-    // ── Scale from face width ────────────────────────────────────────────────
-    // faceWidthNorm is 0..1, multiply by calibrationFactor and aspect
-    const scale = faceWidthNorm * calibrationFactor * aspect * 1.4;
+    // ── Rotation ─────────────────────────────────────────────────────────────
+    // Build face-aligned orthonormal basis from landmark world positions.
 
-    // ── Head tilt from eye line ──────────────────────────────────────────────
-    // angle = atan2(dy, dx) of the eye-to-eye vector
-    // Mirror the dx because video is flipped
-    const dx = isMirrored
-      ? -(rightEye.x - leftEye.x)
-      :  (rightEye.x - leftEye.x);
-    const dy = rightEye.y - leftEye.y;
-    const tiltAngle = Math.atan2(dy, dx);
+    // X: left→right eye direction (face horizontal axis)
+    const xAxis = rightEyeW.clone().sub(leftEyeW).normalize();
 
-    // ── Apply transforms ─────────────────────────────────────────────────────
-    glassesModel.position.set(posX, posY, 0);
-    glassesModel.rotation.set(0, 0, tiltAngle);
-    glassesModel.scale.setScalar(scale);
+    // Raw Y: chin→forehead (face vertical axis, approximate)
+    const yRaw  = foreW.clone().sub(chinW).normalize();
+
+    // Z: face normal toward camera = X cross rawY
+    const zAxis = new THREE.Vector3().crossVectors(xAxis, yRaw).normalize();
+
+    // Re-orthogonalize Y so it is exactly perpendicular to X and Z
+    const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+
+    // Build and apply the rotation matrix
+    const rotMat = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+    glassesModel.setRotationFromMatrix(rotMat);
+
+    // ── Position ────────────────────────────────────────────────────────────
+    // The model origin IS the nose bridge (set in Blender).
+    //
+    // X: pupil midpoint (horizontal centering)
+    // Y: lm[6] — the lower nose bridge where pads actually rest, NOT lm[168]
+    //    which is too high (between inner eye corners)
+    // Z: 0 — flat on the 2D video plane. The face is a flat image at z=0;
+    //    using landmark Z pushes glasses forward due to MediaPipe's relative
+    //    depth values, causing the "floating" gap. Z=0 eliminates this.
+    const pupilMidW = leftIrisW.clone().add(rightIrisW).multiplyScalar(0.5);
+    glassesModel.position.set(pupilMidW.x, nosePadW.y, 0);
   }
 
   // ─── Resize handler ─────────────────────────────────────────────────────────
@@ -344,10 +367,10 @@
     }
 
     if (camera) {
-      camera.left   = -aspect;
-      camera.right  =  aspect;
-      camera.top    =  1;
-      camera.bottom = -1;
+      camera.left   = -W / 2;
+      camera.right  =  W / 2;
+      camera.top    =  H / 2;
+      camera.bottom = -H / 2;
       camera.updateProjectionMatrix();
     }
   }
@@ -360,11 +383,10 @@
   function animate(timestamp) {
     animationId = requestAnimationFrame(animate);
 
-    // Throttle to ~30fps for performance
     if (timestamp - lastTimestamp < FRAME_TIME) return;
     lastTimestamp = timestamp;
 
-    // ── Draw mirrored camera feed to camera canvas ──────────────────────────
+    // Draw mirrored camera feed
     if (cameraCtx && video && video.readyState >= 2) {
       const cw = cameraCanvas.width;
       const ch = cameraCanvas.height;
@@ -378,7 +400,7 @@
       cameraCtx.restore();
     }
 
-    // ── Run face detection ──────────────────────────────────────────────────
+    // Run face detection
     if (faceLandmarker && video && video.readyState >= 2) {
       try {
         const results = faceLandmarker.detectForVideo(video, performance.now());
@@ -388,7 +410,6 @@
           updateGlassesTransform(results.faceLandmarks[0]);
 
           if (glassesModel) glassesModel.visible = true;
-
           if (callbacks.onFaceDetected) callbacks.onFaceDetected();
         } else {
           if (glassesModel) glassesModel.visible = false;
@@ -397,11 +418,11 @@
           if (callbacks.onNoFace) callbacks.onNoFace(secondsWithoutFace);
         }
       } catch (e) {
-        // Suppress per-frame errors silently
+        // Suppress per-frame errors
       }
     }
 
-    // ── Render Three.js scene ───────────────────────────────────────────────
+    // Render Three.js scene
     if (renderer && scene && camera) {
       renderer.render(scene, camera);
     }
@@ -409,26 +430,22 @@
 
   // ─── Cleanup ────────────────────────────────────────────────────────────────
   function cleanup() {
-    // Stop animation
     if (animationId !== null) {
       cancelAnimationFrame(animationId);
       animationId = null;
     }
 
-    // Stop camera stream
     if (stream) {
       stream.getTracks().forEach((t) => t.stop());
       stream = null;
     }
 
-    // Remove hidden video element
     if (video) {
       video.srcObject = null;
       video.remove();
       video = null;
     }
 
-    // Dispose Three.js resources
     if (glassesModel) {
       glassesModel.traverse((child) => {
         if (child.isMesh) {
@@ -449,13 +466,11 @@
       renderer = null;
     }
 
-    // Close faceLandmarker
     if (faceLandmarker) {
       faceLandmarker.close?.();
       faceLandmarker = null;
     }
 
-    // Reset state
     scene = null;
     camera = null;
     cameraCanvas = null;
@@ -468,18 +483,6 @@
 
   // ─── Public API ─────────────────────────────────────────────────────────────
   const EyeleuxAR = {
-    /**
-     * Initialize the AR try-on experience.
-     * @param {object} options
-     * @param {string} options.glbUrl          - URL to the .glb model
-     * @param {string} options.cameraCanvasId  - Canvas element ID for camera feed
-     * @param {string} options.threeCanvasId   - Canvas element ID for Three.js
-     * @param {number} [options.calibration]   - Scale calibration factor (default 1.8)
-     * @param {function} [options.onReady]     - Called when AR is ready
-     * @param {function} [options.onError]     - Called on fatal error (string message)
-     * @param {function} [options.onFaceDetected] - Called each frame when face found
-     * @param {function} [options.onNoFace]    - Called each frame when no face (seconds)
-     */
     async init(options) {
       const {
         glbUrl,
@@ -504,7 +507,6 @@
         throw new Error(err);
       }
 
-      // Size canvases to their parent
       const parent = cameraCanvas.parentElement;
       const W = parent?.clientWidth  || window.innerWidth;
       const H = parent?.clientHeight || window.innerHeight;
@@ -516,21 +518,17 @@
       cameraCtx = cameraCanvas.getContext('2d');
 
       try {
-        // Load all modules in parallel
-        const [, ,] = await Promise.all([
+        await Promise.all([
           setupCamera(),
           loadThree(),
           loadMediaPipe(),
         ]);
 
-        // Setup Three.js scene (after THREE is loaded)
         setupThreeScene();
-        handleResize(); // Initial size sync
+        handleResize();
 
-        // Setup face landmarker (needs MediaPipe loaded)
         await setupFaceLandmarker();
 
-        // Load GLB model (needs THREE + GLTFLoader loaded)
         try {
           await loadGlbModel(glbUrl);
         } catch (glbErr) {
@@ -542,10 +540,8 @@
           return;
         }
 
-        // Register resize handler
         window.addEventListener('resize', handleResize);
 
-        // Start animation loop
         lastFaceDetectedTime = Date.now();
         animate(0);
 
@@ -562,24 +558,18 @@
       }
     },
 
-    /** Update the calibration factor (called by the slider) */
     setCalibration(value) {
       calibrationFactor = parseFloat(value) || 1.8;
     },
 
-    /** Toggle horizontal mirror */
     setMirror(value) {
       isMirrored = Boolean(value);
     },
 
-    /** Cleanup all resources */
     cleanup,
   };
 
-  // Expose globally
   global.EyeleuxAR = EyeleuxAR;
-
-  // Also expose via __eyeleuxAR for the modal cleanup call
   global.__eyeleuxAR = EyeleuxAR;
 
 })(window);
