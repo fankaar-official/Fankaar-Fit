@@ -70,7 +70,7 @@ export const action = async ({ request }) => {
             {
               filename,
               mimeType: "model/gltf-binary",
-              httpMethod: "POST",
+              httpMethod: "PUT",
               resource: "FILE",
               fileSize: String(fileSize),
             },

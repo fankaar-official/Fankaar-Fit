@@ -330,17 +330,17 @@ export default function ProductTryOnManager() {
         const urlData = await urlRes.json();
         if (urlData.error) throw new Error(urlData.error);
 
-        // Step 2: Upload file DIRECTLY from browser to Shopify's CDN (bypasses Vercel)
+        // Step 2: Upload file DIRECTLY from browser to Shopify's CDN via PUT
         setUploadProgress(10);
         const { url: uploadUrl, resourceUrl, parameters } = urlData;
 
-        const uploadForm = new FormData();
+        // For PUT uploads, parameters go as request headers
+        const headers = {};
         for (const param of parameters) {
-          uploadForm.append(param.name, param.value);
+          headers[param.name] = param.value;
         }
-        uploadForm.append("file", file, file.name);
 
-        const cdnUrl = await uploadDirectToShopify(uploadUrl, uploadForm, (pct) => {
+        await uploadDirectToShopify(uploadUrl, file, headers, (pct) => {
           // Map 10-80% range for the actual upload
           setUploadProgress(10 + Math.round(pct * 0.7));
         });
@@ -638,7 +638,7 @@ export default function ProductTryOnManager() {
 
 // ─── Upload directly to Shopify's CDN with XHR progress ──────────────────────
 
-function uploadDirectToShopify(url, formData, onProgress) {
+function uploadDirectToShopify(url, file, headers, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.upload.addEventListener("progress", (e) => {
@@ -650,15 +650,19 @@ function uploadDirectToShopify(url, formData, onProgress) {
       if (xhr.status >= 200 && xhr.status < 400) {
         resolve(true);
       } else {
-        // Include response body for debugging HTTP 400 errors
-        const body = xhr.responseText?.substring(0, 200) || "";
+        const body = xhr.responseText?.substring(0, 300) || "";
         console.error(`[Upload] HTTP ${xhr.status} response:`, body);
         reject(new Error(`Upload to Shopify failed: HTTP ${xhr.status}. ${body}`));
       }
     });
     xhr.addEventListener("error", () => reject(new Error("Network error during upload to Shopify")));
-    xhr.open("POST", url);
-    xhr.send(formData);
+    xhr.open("PUT", url);
+    // Set headers from Shopify's staged upload parameters
+    for (const [key, value] of Object.entries(headers)) {
+      xhr.setRequestHeader(key, value);
+    }
+    xhr.setRequestHeader("Content-Type", "model/gltf-binary");
+    xhr.send(file);  // Send raw file bytes — no multipart overhead
   });
 }
 
