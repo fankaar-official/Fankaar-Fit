@@ -55,7 +55,7 @@
   // ║  Changes take effect INSTANTLY — no redeploy needed!               ║
   // ╚══════════════════════════════════════════════════════════════════════╝
   let TUNE_SCALE  = 1.2;   // Glasses width multiplier (1.0 = eye width, 1.2 = 20% wider)
-  let TUNE_Y      = -30;   // Y offset in pixels (negative = DOWN toward nose)
+  let TUNE_Y      = 0;     // Y offset in pixels (negative = DOWN toward nose)
   let TUNE_X      = 0;     // X offset in pixels (negative = LEFT)
   let TUNE_Z      = 0;     // Z offset (negative = push INTO face, positive = pull AWAY)
   let TUNE_BLEND  = 0.5;   // Y anchor: 0.0 = nose bridge, 1.0 = pupil midpoint
@@ -220,7 +220,7 @@
     camera.lookAt(0, 0, -1);
     
     // Initialize global model fix rotations
-    window.modelFixX = 0.1; // Slight downward pitch (5.7 degrees) so temples rest on ears
+    window.modelFixX = -0.15; // Negative pitch tilts temples downwards to rest on the ears
     window.modelFixY = Math.PI; // Restore 180deg flip (GLTF naturally exports facing -Z)
     window.modelFixZ = 0;
     
