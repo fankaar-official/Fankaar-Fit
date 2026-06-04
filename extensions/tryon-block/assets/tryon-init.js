@@ -42,7 +42,7 @@
     var container = getContainer();
     if (!buttonsDiv || !container) return;
 
-    var enabled = window.__eyeleux?.tryonEnabled === true;
+    var enabled = String(window.__eyeleux?.tryonEnabled) === 'true';
     var hasGlb = Boolean(glbUrl && glbUrl.trim());
 
     if (enabled && hasGlb) {
@@ -594,53 +594,34 @@
       });
     }
 
-    // Intercept History API and DOM clicks for foolproof variant detection
-    function handleVariantUrlChange() {
-      setTimeout(function() {
-        var params = new URLSearchParams(window.location.search);
-        var variantId = params.get('variant');
-        
-        // Also try to find a selected hidden input if URL has no variant
+    // Bulletproof polling for variant changes
+    var lastVariantId = null;
+    setInterval(function() {
+      var params = new URLSearchParams(window.location.search);
+      var currentVariantId = params.get('variant');
+      
+      // Also try to find a selected hidden input if URL has no variant
+      if (!currentVariantId) {
         var inputSelect = document.querySelector('form[action^="/cart/add"] [name="id"], input[name="id"]');
-        if (!variantId && inputSelect) {
-          variantId = inputSelect.value;
+        if (inputSelect) {
+          currentVariantId = inputSelect.value;
         }
+      }
 
-        if (variantId) {
-          var glbUrl = window.__eyeleux?.variantGlbUrls?.[variantId] || '';
-          var cont = getContainer();
-          if (cont) {
-            cont.dataset.glbUrl = glbUrl;
-            cont.dataset.variantId = variantId;
-            // Get the title from our array if possible
-            var vObj = window.__eyeleux?.variants?.find(v => String(v.id) === String(variantId));
-            if (vObj) cont.dataset.variantTitle = vObj.title;
-          }
-          updateButtonsVisibility(glbUrl);
+      if (currentVariantId && currentVariantId !== lastVariantId) {
+        lastVariantId = currentVariantId;
+        var glbUrl = window.__eyeleux?.variantGlbUrls?.[currentVariantId] || '';
+        var cont = getContainer();
+        if (cont) {
+          cont.dataset.glbUrl = glbUrl;
+          cont.dataset.variantId = currentVariantId;
+          // Get the title from our array if possible
+          var vObj = window.__eyeleux?.variants?.find(v => String(v.id) === String(currentVariantId));
+          if (vObj) cont.dataset.variantTitle = vObj.title;
         }
-      }, 50);
-    }
-
-    var originalPushState = history.pushState;
-    history.pushState = function() {
-      originalPushState.apply(this, arguments);
-      handleVariantUrlChange();
-    };
-
-    var originalReplaceState = history.replaceState;
-    history.replaceState = function() {
-      originalReplaceState.apply(this, arguments);
-      handleVariantUrlChange();
-    };
-
-    window.addEventListener('popstate', handleVariantUrlChange);
-    document.addEventListener('click', handleVariantUrlChange);
-
-    // Also handle native variant selector change natively
-    var variantSelects = document.querySelectorAll('select[name="id"], input[name="id"]');
-    variantSelects.forEach(function(select) {
-      select.addEventListener('change', handleVariantUrlChange);
-    });
+        updateButtonsVisibility(glbUrl);
+      }
+    }, 250);
   }
 
   // ─── Utility ────────────────────────────────────────────────────────────────
