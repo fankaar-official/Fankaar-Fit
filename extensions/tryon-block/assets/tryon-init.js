@@ -130,7 +130,7 @@
       + '  bottom: 0; left: 0; right: 0;'
       + '  z-index: 25;'
       + '  background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 70%, transparent 100%);'
-      + '  padding: 12px 16px 16px;'
+      + '  padding: 24px 16px 54px;'
       + '}'
       + '.eyeleux-carousel-track {'
       + '  display: flex;'
@@ -226,7 +226,7 @@
       + '</model-viewer>'
 
       // Footer text
-      + '<div style="position:absolute;bottom:' + (carouselHTML ? '120' : '24') + 'px;left:24px;color:rgba(255,255,255,0.4);font-size:12px;pointer-events:none;font-weight:500;">Developed by Fankaar Studio</div>'
+      + '<div style="position:absolute;bottom:24px;width:100%;text-align:center;color:rgba(255,255,255,0.4);font-size:11px;pointer-events:none;font-weight:500;z-index:30;">Developed by Fankaar Studio</div>'
 
       // Variant carousel
       + carouselHTML;
@@ -311,7 +311,7 @@
       + '#eyeleux-status-text { color:#fff;font-size:14px;text-align:center;max-width:260px; }'
       + '#eyeleux-header { position:absolute;top:0;left:0;right:0;padding:16px 20px;display:flex;align-items:flex-start;justify-content:space-between;background:linear-gradient(to bottom,rgba(0,0,0,0.7),transparent);z-index:30;pointer-events:none; }'
       + '#eyeleux-header button { pointer-events:all; }'
-      + '#eyeleux-footer { position:absolute;bottom:' + (carouselHTML ? '105' : '0') + 'px;left:0;right:0;padding:20px;display:flex;flex-direction:column;align-items:center;gap:12px;z-index:30; }'
+      + '#eyeleux-footer { position:absolute;bottom:' + (carouselHTML ? '145' : '24') + 'px;left:0;right:0;padding:20px;display:flex;flex-direction:column;align-items:center;gap:12px;z-index:30; }'
       + '#eyeleux-instruction { color:rgba(255,255,255,0.9);font-size:14px;background:rgba(0,0,0,0.4);padding:8px 16px;border-radius:20px;text-align:center;transition:opacity 0.5s; }'
       + '#eyeleux-tryon-close { background:rgba(255,255,255,0.15);border:none;color:#fff;width:40px;height:40px;min-width:40px;min-height:40px;padding:0;margin:0;box-sizing:border-box;line-height:1;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px); }'
       + '#eyeleux-mirror-btn { background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;cursor:pointer;backdrop-filter:blur(4px); }'
@@ -319,7 +319,7 @@
       + '#eyeleux-error-overlay.visible { display:flex; }'
       + '#eyeleux-error-msg { color:#fff;font-size:15px;text-align:center;max-width:300px; }'
       + '#eyeleux-retry-btn { background:#fff;color:#000;border:none;padding:10px 24px;border-radius:24px;font-weight:600;cursor:pointer; }'
-      + '#eyeleux-calibration { position:absolute;bottom:' + (carouselHTML ? '185' : '80') + 'px;left:16px;z-index:35;background:rgba(0,0,0,0.6);padding:8px 12px;border-radius:8px;display:none;gap:8px;align-items:center; }'
+      + '#eyeleux-calibration { position:absolute;bottom:' + (carouselHTML ? '225' : '100') + 'px;left:16px;z-index:35;background:rgba(0,0,0,0.6);padding:8px 12px;border-radius:8px;display:none;gap:8px;align-items:center; }'
       + '#eyeleux-calibration.visible { display:flex; }'
       + '#eyeleux-calibration label { color:#fff;font-size:12px; }'
       + '#eyeleux-calibration input { width:100px; }'
@@ -567,6 +567,40 @@
 
     // Set up variant change listener
     document.addEventListener('variant:change', handleVariantChange);
+
+    // Watch URL changes for modern themes (like Dawn)
+    function checkUrlForVariantChange() {
+      var urlParams = new URLSearchParams(window.location.search);
+      var variantId = urlParams.get('variant');
+      if (variantId) {
+        var glbUrl = window.__eyeleux?.variantGlbUrls?.[variantId] || '';
+        var cont = getContainer();
+        if (cont) {
+          cont.dataset.glbUrl = glbUrl;
+          cont.dataset.variantId = variantId;
+          // Look up title if available
+          var vData = window.__eyeleux?.variants?.find(function(v) { return v.id === variantId; });
+          if (vData) cont.dataset.variantTitle = vData.title;
+        }
+        updateButtonsVisibility(glbUrl);
+      }
+    }
+
+    var originalPushState = history.pushState;
+    history.pushState = function() {
+      originalPushState.apply(this, arguments);
+      setTimeout(checkUrlForVariantChange, 50);
+    };
+
+    var originalReplaceState = history.replaceState;
+    history.replaceState = function() {
+      originalReplaceState.apply(this, arguments);
+      setTimeout(checkUrlForVariantChange, 50);
+    };
+
+    window.addEventListener('popstate', function() {
+      setTimeout(checkUrlForVariantChange, 50);
+    });
 
     // Also listen to Shopify's section:rerender event
     document.addEventListener('section:rerender', function() {
