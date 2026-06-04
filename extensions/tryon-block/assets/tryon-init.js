@@ -230,12 +230,21 @@
     document.body.appendChild(modal);
     document.body.style.overflow = 'hidden';
 
-    // Hide loader when model finishes loading
+    // Hide loader when model finishes loading or show error
     var mv = document.getElementById('eyeleux-mv');
     if (mv) {
       mv.addEventListener('load', function() {
         var progress = this.querySelector('[slot="progress-bar"]');
         if (progress) progress.style.display = 'none';
+      });
+      mv.addEventListener('error', function(e) {
+        var progress = this.querySelector('[slot="progress-bar"]');
+        var currentSrc = this.getAttribute('src');
+        if (progress) {
+          progress.style.background = 'rgba(200,0,0,0.9)';
+          progress.innerHTML = '<div style="text-align:center"><b>Failed to load 3D File!</b><br><span style="font-size:11px;opacity:0.8;word-break:break-all;">' + escapeHtml(currentSrc) + '</span></div>';
+        }
+        console.error('[EyeLeux] Model Viewer Error. URL:', currentSrc, e);
       });
     }
 
