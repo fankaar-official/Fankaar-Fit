@@ -106,11 +106,7 @@
         + 'data-variant-id="' + escapeHtml(v.id) + '" '
         + 'aria-label="Switch to ' + escapeHtml(v.title) + '"'
         + '>'
-        + '<model-viewer src="' + escapeHtml(v.glbUrl) + '" '
-        + 'orientation="180deg 0 0" camera-orbit="180deg 75deg 105%" auto-rotate camera-controls="false" interaction-prompt="none" '
-        + 'style="width:100%;height:100%;pointer-events:none;background:transparent;" '
-        + 'environment-image="neutral" shadow-intensity="0"'
-        + '></model-viewer>'
+        + '<img src="' + escapeHtml(v.image) + '" style="width:100%;height:100%;object-fit:cover;border-radius:10px;pointer-events:none;" alt="' + escapeHtml(v.title) + '">'
         + '<span class="eyeleux-carousel-label">' + escapeHtml(v.title) + '</span>'
         + '</button>';
     }
