@@ -9,8 +9,8 @@
   - Current variant must have metafield: namespace="tryon", key="glb_url"
 {% endcomment %}
 
-{% assign tryon_enabled = product.metafields.tryon.enabled %}
-{% assign variant_glb_url = product.selected_or_first_available_variant.metafields.tryon.glb_url %}
+{% assign tryon_enabled = product.metafields.tryon.enabled.value %}
+{% assign variant_glb_url = product.selected_or_first_available_variant.metafields.tryon.glb_url.value %}
 
 <div
   id="eyeleux-tryon-container"
@@ -97,7 +97,7 @@
   window.__eyeleux = window.__eyeleux || {};
   window.__eyeleux.variantGlbUrls = {
     {% for variant in product.variants %}
-      "{{ variant.id }}": "{{ variant.metafields.tryon.glb_url | default: '' }}"{% unless forloop.last %},{% endunless %}
+      "{{ variant.id }}": "{{ variant.metafields.tryon.glb_url.value | default: '' }}"{% unless forloop.last %},{% endunless %}
     {% endfor %}
   };
   window.__eyeleux.variants = [
@@ -106,7 +106,7 @@
         "id": "{{ variant.id }}",
         "title": {{ variant.title | json }},
         "image": "{{ variant.featured_image.src | image_url: width: 100 | default: '' }}",
-        "glbUrl": "{{ variant.metafields.tryon.glb_url | default: '' }}"
+        "glbUrl": "{{ variant.metafields.tryon.glb_url.value | default: '' }}"
       }{% unless forloop.last %},{% endunless %}
     {% endfor %}
   ];
