@@ -268,6 +268,7 @@ export default function ProductTryOnManager() {
   const { product } = useLoaderData();
   const navigate = useNavigate();
   const fetcher = useFetcher();
+  const saveFetcher = useFetcher();
   const navigation = useNavigation();
 
   const [tryOnEnabled, setTryOnEnabled] = useState(product.tryOnEnabled);
@@ -288,9 +289,9 @@ export default function ProductTryOnManager() {
     form.set("intent", "save-enabled");
     form.set("enabled", String(tryOnEnabled));
     form.set("metafieldId", product.enabledMetafieldId || "");
-    fetcher.submit(form, { method: "post" });
+    saveFetcher.submit(form, { method: "post" });
     setToast("Try-On settings saved!");
-  }, [tryOnEnabled, product.enabledMetafieldId, fetcher]);
+  }, [tryOnEnabled, product.enabledMetafieldId, saveFetcher]);
 
   // ── Upload GLB ───────────────────────────────────────────────────────────
   const handleUploadClick = useCallback((variant) => {
@@ -417,7 +418,7 @@ export default function ProductTryOnManager() {
         primaryAction={{
           content: "Save Settings",
           onAction: handleSaveEnabled,
-          loading: fetcher.state !== "idle",
+          loading: saveFetcher.state !== "idle",
         }}
       >
         {/* Hidden file input */}
