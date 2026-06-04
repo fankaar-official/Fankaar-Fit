@@ -107,7 +107,7 @@
         + 'aria-label="Switch to ' + escapeHtml(v.title) + '"'
         + '>'
         + '<model-viewer src="' + escapeHtml(v.glbUrl) + '" '
-        + 'auto-rotate camera-controls="false" interaction-prompt="none" '
+        + 'orientation="180deg 0 0" camera-orbit="180deg 75deg 105%" auto-rotate camera-controls="false" interaction-prompt="none" '
         + 'style="width:100%;height:100%;pointer-events:none;background:transparent;" '
         + 'environment-image="neutral" shadow-intensity="0"'
         + '></model-viewer>'
@@ -202,7 +202,9 @@
     modal.innerHTML = ''
       + '<style>'
       + '@keyframes eyeleuxFadeIn { from { opacity: 0; } to { opacity: 1; } }'
+      + '@keyframes eyeleuxSpin { 100% { transform: rotate(360deg); } }'
       + '#eyeleux-3d-modal model-viewer#eyeleux-mv { width: 100%; height: 100%; }'
+      + '#eyeleux-3d-modal .hide { display: none !important; }'
       + getCarouselCSS()
       + '</style>'
 
@@ -212,20 +214,34 @@
       + '<div style="color:#fff;font-weight:700;font-size:16px;">' + escapeHtml(productTitle) + '</div>'
       + '<div id="eyeleux-3d-variant-label" style="color:rgba(255,255,255,0.7);font-size:13px;">' + escapeHtml(variantTitle) + '</div>'
       + '</div>'
-      + '<button id="eyeleux-3d-close" aria-label="Close 3D view" style="background:rgba(255,255,255,0.15);border:none;color:#fff;width:40px;height:40px;border-radius:50%;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);transition:background 0.2s;">✕</button>'
+      + '<button id="eyeleux-3d-close" aria-label="Close 3D view" style="background:rgba(255,255,255,0.15);border:none;color:#fff;width:40px;height:40px;min-width:40px;min-height:40px;padding:0;margin:0;box-sizing:border-box;line-height:1;border-radius:50%;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);transition:background 0.2s;">✕</button>'
       + '</div>'
 
       // Model viewer
-      + '<model-viewer id="eyeleux-mv" src="' + escapeHtml(glbUrl) + '" alt="3D view of ' + escapeHtml(productTitle) + '" auto-rotate camera-controls shadow-intensity="1" environment-image="neutral" exposure="1" ar ar-modes="webxr scene-viewer quick-look" style="width:100vw;height:100vh;background:transparent;"></model-viewer>'
+      + '<model-viewer id="eyeleux-mv" src="' + escapeHtml(glbUrl) + '" alt="3D view of ' + escapeHtml(productTitle) + '" orientation="180deg 0 0" camera-orbit="180deg 75deg 105%" auto-rotate camera-controls shadow-intensity="1" environment-image="neutral" exposure="1" ar ar-modes="webxr scene-viewer quick-look" style="width:100vw;height:100vh;background:transparent;">'
+      + '  <div slot="progress-bar" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-weight:600;font-size:14px;background:rgba(0,0,0,0.6);padding:10px 20px;border-radius:20px;display:flex;align-items:center;gap:10px;backdrop-filter:blur(4px);">'
+      + '    <svg style="width:18px;height:18px;animation:eyeleuxSpin 1s linear infinite;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-dashoffset="0"></circle></svg>'
+      + '    Loading Model...'
+      + '  </div>'
+      + '</model-viewer>'
 
-      // AR button for mobile
-      + '<button slot="ar-button" style="position:absolute;bottom:' + (carouselHTML ? '120' : '24') + 'px;right:24px;padding:10px 18px;background:rgba(255,255,255,0.9);border:none;border-radius:24px;font-weight:600;cursor:pointer;font-size:14px;">📱 View in your space</button>'
+      // Footer text
+      + '<div style="position:absolute;bottom:' + (carouselHTML ? '120' : '24') + 'px;left:24px;color:rgba(255,255,255,0.4);font-size:12px;pointer-events:none;font-weight:500;">Developed by Fankaar Studio</div>'
 
       // Variant carousel
       + carouselHTML;
 
     document.body.appendChild(modal);
     document.body.style.overflow = 'hidden';
+
+    // Hide loader when model finishes loading
+    var mv = document.getElementById('eyeleux-mv');
+    if (mv) {
+      mv.addEventListener('load', function() {
+        var progress = this.querySelector('[slot="progress-bar"]');
+        if (progress) progress.style.display = 'none';
+      });
+    }
 
     // Close handlers
     var close = function() {
@@ -254,7 +270,11 @@
 
         // Update model viewer source
         var mv = document.getElementById('eyeleux-mv');
-        if (mv) mv.setAttribute('src', newGlbUrl);
+        if (mv) {
+          var progress = mv.querySelector('[slot="progress-bar"]');
+          if (progress) progress.style.display = 'flex';
+          mv.setAttribute('src', newGlbUrl);
+        }
 
         // Update variant label
         var label = document.getElementById('eyeleux-3d-variant-label');
@@ -293,7 +313,7 @@
       + '#eyeleux-header button { pointer-events:all; }'
       + '#eyeleux-footer { position:absolute;bottom:' + (carouselHTML ? '105' : '0') + 'px;left:0;right:0;padding:20px;display:flex;flex-direction:column;align-items:center;gap:12px;z-index:30; }'
       + '#eyeleux-instruction { color:rgba(255,255,255,0.9);font-size:14px;background:rgba(0,0,0,0.4);padding:8px 16px;border-radius:20px;text-align:center;transition:opacity 0.5s; }'
-      + '#eyeleux-tryon-close { background:rgba(255,255,255,0.15);border:none;color:#fff;width:40px;height:40px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px); }'
+      + '#eyeleux-tryon-close { background:rgba(255,255,255,0.15);border:none;color:#fff;width:40px;height:40px;min-width:40px;min-height:40px;padding:0;margin:0;box-sizing:border-box;line-height:1;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px); }'
       + '#eyeleux-mirror-btn { background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;cursor:pointer;backdrop-filter:blur(4px); }'
       + '#eyeleux-error-overlay { position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.9);z-index:40;gap:16px;padding:24px; }'
       + '#eyeleux-error-overlay.visible { display:flex; }'
@@ -311,6 +331,13 @@
 
       // Three.js canvas (transparent overlay)
       + '<canvas id="eyeleux-three-canvas"></canvas>'
+
+      // Face detection targeting box (centered)
+      + '<div id="eyeleux-face-box" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:25;opacity:0;transition:opacity 0.3s;">'
+      + '<div style="width:280px;height:340px;border:2px dashed rgba(255,255,255,0.7);border-radius:24px;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.15);">'
+      + '<div style="color:#fff;font-size:15px;font-weight:600;text-align:center;padding:20px;text-shadow:0 2px 4px rgba(0,0,0,0.8);letter-spacing:0.02em;">Please position your face<br>in the center</div>'
+      + '</div>'
+      + '</div>'
 
       // Loading overlay
       + '<div id="eyeleux-loading-overlay">'
@@ -384,7 +411,7 @@
     // ── Calibration slider ─────────────────────────────────────────────────
     var calSlider = document.getElementById('eyeleux-cal-slider');
     var calVal = document.getElementById('eyeleux-cal-val');
-    var savedCal = parseFloat(localStorage.getItem('eyeleux_cal') || '1.8');
+    var savedCal = parseFloat(localStorage.getItem('eyeleux_cal') || '1.08');
     calSlider.value = savedCal;
     calVal.textContent = savedCal.toFixed(2);
 
@@ -490,7 +517,7 @@
           glbUrl: glbUrl,
           cameraCanvasId: 'eyeleux-camera-canvas',
           threeCanvasId: 'eyeleux-three-canvas',
-          calibration: parseFloat(localStorage.getItem('eyeleux_cal') || '1.8'),
+          calibration: parseFloat(localStorage.getItem('eyeleux_cal') || '1.08'),
           onReady: function() {
             hideLoading();
             var instruction = document.getElementById('eyeleux-instruction');
@@ -506,12 +533,14 @@
             if (instruction) {
               setTimeout(function() { instruction.style.opacity = '0'; }, 3000);
             }
+            var box = document.getElementById('eyeleux-face-box');
+            if (box) box.style.opacity = '0';
           },
           onNoFace: function(secondsWithoutFace) {
-            var instruction = document.getElementById('eyeleux-instruction');
-            if (instruction && secondsWithoutFace > 5) {
-              instruction.textContent = '📍 Point camera at your face';
-              instruction.style.opacity = '1';
+            var box = document.getElementById('eyeleux-face-box');
+            // Show the targeting box after 1 second to avoid flashing on quick movements
+            if (box && secondsWithoutFace > 1.0) {
+              box.style.opacity = '1';
             }
           },
         });

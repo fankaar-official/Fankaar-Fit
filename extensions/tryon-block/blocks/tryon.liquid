@@ -10,7 +10,8 @@
 {% endcomment %}
 
 {% assign tryon_enabled = product.metafields.tryon.enabled %}
-{% assign variant_glb_url = product.selected_or_first_available_variant.metafields.tryon.glb_url %}
+{% assign glb_obj = product.selected_or_first_available_variant.metafields.tryon.model | default: product.selected_or_first_available_variant.metafields.tryon.glb_url %}
+{% assign variant_glb_url = glb_obj.value.url | default: glb_obj %}
 
 <div
   id="eyeleux-tryon-container"
@@ -97,7 +98,8 @@
   window.__eyeleux = window.__eyeleux || {};
   window.__eyeleux.variantGlbUrls = {
     {% for variant in product.variants %}
-      "{{ variant.id }}": "{{ variant.metafields.tryon.glb_url | default: '' }}"{% unless forloop.last %},{% endunless %}
+      {% assign loop_glb = variant.metafields.tryon.model | default: variant.metafields.tryon.glb_url %}
+      "{{ variant.id }}": "{{ loop_glb.value.url | default: loop_glb | default: '' }}"{% unless forloop.last %},{% endunless %}
     {% endfor %}
   };
   window.__eyeleux.variants = [
@@ -106,7 +108,8 @@
         "id": "{{ variant.id }}",
         "title": {{ variant.title | json }},
         "image": "{{ variant.featured_image.src | image_url: width: 100 | default: '' }}",
-        "glbUrl": "{{ variant.metafields.tryon.glb_url | default: '' }}"
+        {% assign loop_glb2 = variant.metafields.tryon.model | default: variant.metafields.tryon.glb_url %}
+        "glbUrl": "{{ loop_glb2.value.url | default: loop_glb2 | default: '' }}"
       }{% unless forloop.last %},{% endunless %}
     {% endfor %}
   ];

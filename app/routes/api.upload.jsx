@@ -125,7 +125,7 @@ export const action = async ({ request }) => {
       const createdFile = fileData.data.fileCreate.files[0];
       const cdnUrl = createdFile?.url || resourceUrl;
 
-      return json({ success: true, cdnUrl });
+      return json({ success: true, cdnUrl, fileId: createdFile?.id });
     } catch (err) {
       console.error("File create error:", err);
       return json({ error: err.message || "Failed to register file" }, { status: 500 });

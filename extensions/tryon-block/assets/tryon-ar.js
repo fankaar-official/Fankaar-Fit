@@ -41,9 +41,24 @@
   let cameraCtx = null;
   let animationId = null;
 
-  let calibrationFactor = 1.8;
+  let calibrationFactor = 1.08;
+  let templeClipPlane = null;
   let isMirrored = true;
   let lastFaceDetectedTime = 0;
+
+  // ╔══════════════════════════════════════════════════════════════════════╗
+  // ║              LIVE CALIBRATION (adjustable from Console)             ║
+  // ║                                                                    ║
+  // ║  In browser Console, type:                                         ║
+  // ║    EyeleuxAR.tune({ scale: 1.2, y: -40, x: 0, blend: 0.3 })       ║
+  // ║                                                                    ║
+  // ║  Changes take effect INSTANTLY — no redeploy needed!               ║
+  // ╚══════════════════════════════════════════════════════════════════════╝
+  let TUNE_SCALE  = 1.2;   // Glasses width multiplier (1.0 = eye width, 1.2 = 20% wider)
+  let TUNE_Y      = 0;     // Y offset in pixels (negative = DOWN toward nose)
+  let TUNE_X      = 0;     // X offset in pixels (negative = LEFT)
+  let TUNE_Z      = 0;     // Z offset (negative = push INTO face, positive = pull AWAY)
+  let TUNE_BLEND  = 0.5;   // Y anchor: 0.0 = nose bridge, 1.0 = pupil midpoint
 
   let callbacks = {
     onReady: null,
@@ -117,6 +132,64 @@
     });
   }
 
+  // ─── 3D Face Mesh Occluder ────────────────────────────────────────────────
+  let occluderGeometry = null;
+  let occluderMesh = null;
+
+  // Hardcoded MediaPipe canonical face mesh triangulation (898 triangles)
+  const FACE_MESH_TRIANGLES = [173,155,133,246,33,7,382,398,362,263,466,249,308,415,324,78,95,191,356,389,264,127,34,162,368,264,389,139,162,34,267,0,302,37,72,0,11,302,0,11,0,72,349,451,350,120,121,231,452,350,451,232,231,121,267,302,269,37,39,72,303,269,302,73,72,39,357,343,350,128,121,114,277,350,343,47,114,121,350,452,357,121,128,232,453,357,452,233,232,128,299,333,297,69,67,104,332,297,333,103,104,67,175,152,396,175,171,152,377,396,152,148,152,171,381,384,382,154,155,157,398,382,384,173,157,155,280,347,330,50,101,118,348,330,347,119,118,101,269,303,270,39,40,73,304,270,303,74,73,40,9,336,151,9,151,107,337,151,336,108,107,151,344,278,360,115,131,48,279,360,278,49,48,131,262,431,418,32,194,211,424,418,431,204,211,194,304,408,270,74,40,184,409,270,408,185,184,40,272,310,407,42,183,80,415,407,310,191,80,183,322,270,410,92,186,40,409,410,270,185,40,186,347,449,348,118,119,229,450,348,449,230,229,119,434,432,430,214,210,212,422,430,432,202,212,210,313,314,18,83,18,84,17,18,314,17,84,18,307,375,306,77,76,146,291,306,375,61,146,76,259,387,260,29,30,160,388,260,387,161,160,30,286,414,384,56,157,190,398,384,414,173,190,157,418,424,406,194,182,204,335,406,424,106,204,182,367,416,364,138,135,192,434,364,416,214,192,135,391,423,327,165,98,203,358,327,423,129,203,98,298,301,284,68,54,71,251,284,301,21,71,54,4,275,5,4,5,45,281,5,275,51,45,5,254,373,253,24,23,144,374,253,373,145,144,23,320,321,307,90,77,91,375,307,321,146,91,77,280,425,411,50,187,205,427,411,425,207,205,187,421,313,200,201,200,83,18,200,313,18,83,200,335,321,406,106,182,91,405,406,321,181,91,182,405,321,404,181,180,91,320,404,321,90,91,180,17,314,16,17,16,84,315,16,314,85,84,16,425,266,426,205,206,36,423,426,266,203,36,206,369,396,400,140,176,171,377,400,396,148,171,176,391,269,322,165,92,39,270,322,269,40,39,92,417,465,413,193,189,245,464,413,465,244,245,189,257,258,386,27,159,28,385,386,258,158,28,159,260,388,467,30,247,161,466,467,388,246,161,247,248,456,419,3,196,236,399,419,456,174,236,196,333,298,332,104,103,68,284,332,298,54,68,103,285,8,417,55,193,8,168,417,8,168,8,193,340,261,346,111,117,31,448,346,261,228,31,117,285,417,441,55,221,193,413,441,417,189,193,221,327,460,326,98,97,240,328,326,460,99,240,97,277,355,329,47,100,126,371,329,355,142,126,100,309,392,438,79,218,166,439,438,392,219,166,218,381,382,256,154,26,155,341,256,382,112,155,26,360,279,420,131,198,49,429,420,279,209,49,198,365,364,379,136,150,135,394,379,364,169,135,150,355,277,437,126,217,47,343,437,277,114,47,217,443,444,282,223,52,224,283,282,444,53,224,52,281,275,363,51,134,45,440,363,275,220,45,134,431,262,395,211,170,32,369,395,262,140,32,170,337,299,338,108,109,69,297,338,299,67,69,109,335,273,321,106,91,43,375,321,273,146,43,91,348,450,349,119,120,230,451,349,450,231,230,120,467,359,342,247,113,130,446,342,359,226,130,113,282,283,334,52,105,53,293,334,283,63,53,105,250,458,462,20,242,238,461,462,458,241,238,242,276,353,300,46,70,124,383,300,353,156,124,70,325,292,324,96,95,62,308,324,292,78,62,95,283,276,293,53,63,46,300,293,276,70,46,63,447,264,345,227,116,34,372,345,264,143,34,116,352,345,346,123,117,116,340,346,345,111,116,117,1,19,274,1,44,19,354,274,19,125,19,44,248,281,456,3,236,51,363,456,281,134,51,236,425,426,427,205,207,206,436,427,426,216,206,207,380,381,252,153,22,154,256,252,381,26,154,22,391,393,269,165,39,167,267,269,393,37,167,39,199,428,200,199,200,208,421,200,428,201,208,200,330,329,266,101,36,100,371,266,329,142,100,36,422,432,273,202,43,212,287,273,432,57,212,43,290,250,328,60,99,20,462,328,250,242,20,99,258,286,385,28,158,56,384,385,286,157,56,158,342,446,353,113,124,226,265,353,446,35,226,124,257,386,259,27,29,159,387,259,386,160,159,29,430,422,431,210,211,202,424,431,422,204,202,211,445,342,276,225,46,113,353,276,342,124,113,46,424,422,335,204,106,202,273,335,422,43,202,106,306,292,307,76,77,62,325,307,292,96,62,77,366,447,352,137,123,227,345,352,447,116,227,123,302,268,303,72,73,38,271,303,268,41,38,73,371,358,266,142,36,129,423,266,358,203,129,36,327,294,460,98,240,64,455,460,294,235,64,240,294,331,278,64,48,102,279,278,331,49,102,48,303,271,304,73,74,41,272,304,271,42,41,74,427,436,434,207,214,216,432,434,436,212,216,214,304,272,408,74,184,42,407,408,272,183,42,184,394,430,395,169,170,210,431,395,430,211,210,170,395,369,378,170,149,140,400,378,369,176,140,149,296,334,299,66,69,105,333,299,334,104,105,69,417,168,351,193,122,168,6,351,168,6,168,122,280,411,352,50,123,187,376,352,411,147,187,123,319,320,325,89,96,90,307,325,320,77,90,96,285,295,336,55,107,65,296,336,295,66,65,107,404,320,403,180,179,90,319,403,320,89,90,179,330,348,329,101,100,119,349,329,348,120,119,100,334,293,333,105,104,63,298,333,293,68,63,104,323,454,366,93,137,234,447,366,454,227,234,137,16,315,15,16,15,85,316,15,315,86,85,15,429,279,358,209,129,49,331,358,279,102,49,129,15,316,14,15,14,86,317,14,316,87,86,14,8,285,9,8,9,55,336,9,285,107,55,9,329,349,277,100,47,120,350,277,349,121,120,47,252,253,380,22,153,23,374,380,253,145,23,153,402,403,318,178,88,179,319,318,403,89,179,88,351,6,419,122,196,6,197,419,6,197,6,196,324,318,325,95,96,88,319,325,318,89,88,96,397,367,365,172,136,138,364,365,367,135,138,136,288,435,397,58,172,215,367,397,435,138,215,172,438,439,344,218,115,219,278,344,439,48,219,115,271,311,272,41,42,81,310,272,311,80,81,42,5,281,195,5,195,51,248,195,281,3,51,195,273,287,375,43,146,57,291,375,287,61,57,146,396,428,175,171,175,208,199,175,428,199,208,175,268,312,271,38,41,82,311,271,312,81,82,41,444,445,283,224,53,225,276,283,445,46,225,53,254,339,373,24,144,110,390,373,339,163,110,144,295,282,296,65,66,52,334,296,282,105,52,66,346,448,347,117,118,228,449,347,448,229,228,118,454,356,447,234,227,127,264,447,356,34,127,227,336,296,337,107,108,66,299,337,296,69,66,108,151,337,10,151,10,108,338,10,337,109,108,10,278,439,294,48,64,219,455,294,439,235,219,64,407,415,292,183,62,191,308,292,415,78,191,62,358,371,429,129,209,142,355,429,371,126,142,209,345,372,340,116,111,143,265,340,372,35,143,111,388,390,466,161,246,163,249,466,390,7,163,246,352,346,280,123,50,117,347,280,346,118,117,50,295,442,282,65,52,222,443,282,442,223,222,52,19,94,354,19,125,94,370,354,94,141,94,125,295,285,442,65,222,55,441,442,285,221,55,222,419,197,248,196,3,197,195,248,197,195,197,3,359,263,255,130,25,33,249,255,263,7,33,25,275,274,440,45,220,44,457,440,274,237,44,220,300,383,301,70,71,156,368,301,383,139,156,71,417,351,465,193,245,122,412,465,351,188,122,245,466,263,467,246,247,33,359,467,263,130,33,247,389,251,368,162,139,21,301,368,251,71,21,139,374,386,380,145,153,159,385,380,386,158,159,153,379,394,378,150,149,169,395,378,394,170,169,149,351,419,412,122,188,196,399,412,419,174,196,188,426,322,436,206,216,92,410,436,322,186,92,216,387,373,388,160,161,144,390,388,373,163,144,161,393,326,164,167,164,97,2,164,326,2,97,164,354,370,461,125,241,141,462,461,370,242,141,241,0,267,164,0,164,37,393,164,267,167,37,164,11,12,302,11,72,12,268,302,12,38,12,72,386,374,387,159,160,145,373,387,374,144,145,160,12,13,268,12,38,13,312,268,13,82,13,38,293,300,298,63,68,70,301,298,300,71,70,68,340,265,261,111,31,35,446,261,265,226,35,31,380,385,381,153,154,158,384,381,385,157,158,154,280,330,425,50,205,101,266,425,330,36,101,205,423,391,426,203,206,165,322,426,391,92,165,206,429,355,420,209,198,126,437,420,355,217,126,198,391,327,393,165,167,98,326,393,327,97,98,167,457,438,440,237,220,218,344,440,438,115,218,220,382,362,341,155,112,133,463,341,362,243,133,112,457,461,459,237,239,241,458,459,461,238,241,239,434,430,364,214,135,210,394,364,430,169,210,135,414,463,398,190,173,243,362,398,463,133,243,173,262,428,369,32,140,208,396,369,428,171,208,140,457,274,461,237,241,44,354,461,274,125,44,241,316,403,317,86,87,179,402,317,403,178,179,87,315,404,316,85,86,180,403,316,404,179,180,86,314,405,315,84,85,181,404,315,405,180,181,85,313,406,314,83,84,182,405,314,406,181,182,84,418,406,421,194,201,182,313,421,406,83,182,201,366,401,323,137,93,177,361,323,401,132,177,93,408,407,306,184,76,183,292,306,407,62,183,76,408,306,409,184,185,76,291,409,306,61,76,185,410,409,287,186,57,185,291,287,409,61,185,57,436,410,432,216,212,186,287,432,410,57,186,212,434,416,427,214,207,192,411,427,416,187,192,207,264,368,372,34,143,139,383,372,368,156,139,143,457,459,438,237,218,239,309,438,459,79,239,218,352,376,366,123,137,147,401,366,376,177,147,137,4,1,275,4,45,1,274,275,1,44,1,45,428,262,421,208,201,32,418,421,262,194,32,201,327,358,294,98,64,129,331,294,358,102,129,64,367,435,416,138,192,215,433,416,435,213,215,192,455,439,289,235,59,219,392,289,439,166,219,59,328,462,326,99,97,242,370,326,462,141,242,97,326,370,2,97,2,141,94,2,370,94,141,2,460,455,305,240,75,235,289,305,455,59,235,75,448,339,449,228,229,110,254,449,339,24,110,229,261,446,255,31,25,226,359,255,446,130,226,25,449,254,450,229,230,24,253,450,254,23,24,230,450,253,451,230,231,23,252,451,253,22,23,231,451,252,452,231,232,22,256,452,252,26,22,232,256,341,452,26,232,112,453,452,341,233,112,232,413,464,414,189,190,244,463,414,464,243,244,190,441,413,286,221,56,189,414,286,413,190,189,56,441,286,442,221,222,56,258,442,286,28,56,222,442,258,443,222,223,28,257,443,258,27,28,223,444,443,259,224,29,223,257,259,443,27,223,29,259,260,444,29,224,30,445,444,260,225,30,224,260,467,445,30,225,247,342,445,467,113,247,225,250,309,458,20,238,79,459,458,309,239,79,238,290,305,392,60,166,75,289,392,305,59,75,166,460,305,328,240,99,75,290,328,305,60,75,99,376,433,401,147,177,213,435,401,433,215,213,177,250,290,309,20,79,60,392,309,290,166,60,79,411,416,376,187,147,192,433,376,416,213,192,147,341,463,453,112,233,243,464,453,463,244,243,233,453,464,357,233,128,244,465,357,464,245,244,128,412,343,465,188,245,114,357,465,343,128,114,245,437,343,399,217,174,114,412,399,343,188,114,174,363,440,360,134,131,220,344,360,440,115,220,131,456,420,399,236,174,198,437,399,420,217,198,174,456,363,420,236,198,134,360,420,363,131,134,198,361,401,288,132,58,177,435,288,401,215,177,58,353,265,383,124,156,35,372,383,265,143,35,156,255,249,339,25,110,7,390,339,249,163,7,110,261,255,448,31,228,25,339,448,255,110,25,228,14,317,13,14,13,87,312,13,317,82,87,13,317,402,312,87,82,178,311,312,402,81,178,82,402,318,311,178,81,88,310,311,318,80,88,81,318,324,310,88,80,95,415,310,324,191,95,80];
+
+  function createOccluderMesh() {
+    if (occluderMesh) return;
+    
+    const indices = FACE_MESH_TRIANGLES;
+    occluderGeometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(478 * 3); 
+    occluderGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    occluderGeometry.setIndex(indices);
+    
+    const occluderMaterial = new THREE.MeshBasicMaterial({
+      colorWrite: false,     // invisible
+      depthWrite: true,      // writes to depth buffer
+      side: THREE.DoubleSide, // double sided to ignore winding order
+      transparent: false,
+    });
+    
+    occluderMesh = new THREE.Mesh(occluderGeometry, occluderMaterial);
+    occluderMesh.name = "faceOccluderMesh";
+    occluderMesh.renderOrder = 0; // render BEFORE glasses
+    scene.add(occluderMesh);
+  }
+
+  function updateOccluderMesh(landmarks, visW, visH, zDepth, turnAmount = 0) {
+    if (!occluderGeometry || !landmarks || landmarks.length === 0) return;
+    
+    const showOccluder = true;
+    occluderMesh.visible = showOccluder;
+    if (!showOccluder) return;
+
+    const positions = occluderGeometry.attributes.position.array;
+    const Z_INFLATE = 1.0; 
+    // Scale offset relative to visW to ensure perfectly consistent depth across all devices and screen sizes!
+    const Z_FORWARD_OFFSET = -0.005 * visW; 
+
+    for (let i = 0; i < landmarks.length; i++) {
+      const lm = landmarks[i];
+      const x = ((isMirrored ? 1 - lm.x : lm.x) - 0.5) * visW;
+      const y = -(lm.y - 0.5) * visH;
+      let z = -(lm.z * visW);
+      
+      z = (z * Z_INFLATE) + Z_FORWARD_OFFSET - zDepth;
+      
+      positions[i * 3]     = x;
+      positions[i * 3 + 1] = y;
+      positions[i * 3 + 2] = z;
+    }
+    
+    occluderGeometry.attributes.position.needsUpdate = true;
+    occluderGeometry.computeVertexNormals();
+  }
+
   // ─── Three.js scene setup ───────────────────────────────────────────────────
   function setupThreeScene() {
     renderer = new THREE.WebGLRenderer({
@@ -131,19 +204,26 @@
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
     renderer.shadowMap.enabled = false;
+    renderer.sortObjects = true;
+    renderer.localClippingEnabled = true;
+    templeClipPlane = new THREE.Plane();
 
     const W = threeCanvas.offsetWidth || window.innerWidth;
     const H = threeCanvas.offsetHeight || window.innerHeight;
     const aspect = W / H;
 
-    // Orthographic camera: world units = screen pixels.
-    // This gives pixel-perfect 2D positioning of the 3D glasses model
-    // on top of the 2D video feed, with no perspective distortion.
-    // Camera at z=10000 with very large near/far to prevent clipping:
-    // the scaled 3D model extends hundreds of pixels in Z-depth.
-    camera = new THREE.OrthographicCamera(-W / 2, W / 2, H / 2, -H / 2, 1, 20000);
-    camera.position.z = 10000;
-
+    // Perspective camera for true 3D spatial AR
+    // 63 degree FOV is a standard webcam match.
+    // Near clipping must be small (0.1) and far must be large enough.
+    camera = new THREE.PerspectiveCamera(63, aspect, 0.1, 2000);
+    camera.position.set(0, 0, 0); // Camera at origin
+    camera.lookAt(0, 0, -1);
+    
+    // Initialize global model fix rotations
+    window.modelFixX = 0;
+    window.modelFixY = Math.PI; // Restore 180deg flip (GLTF naturally exports facing -Z)
+    window.modelFixZ = 0;
+    
     scene = new THREE.Scene();
 
     ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -164,6 +244,8 @@
     pmremGenerator.dispose();
 
     renderer.setSize(W, H);
+    
+    createOccluderMesh();
   }
 
   // ─── Load GLB model ─────────────────────────────────────────────────────────
@@ -175,50 +257,62 @@
         glbUrl,
         (gltf) => {
           const glasses = gltf.scene;
+          glasses.renderOrder = 1; // Render AFTER face mesh
 
           // Fix materials for PBR rendering
           glasses.traverse((child) => {
             if (child.isMesh) {
               child.castShadow = false;
               child.receiveShadow = false;
+              child.renderOrder = 1; // Ensure all meshes render after face mesh
 
               if (Array.isArray(child.material)) {
-                child.material.forEach((mat) => fixMaterial(mat));
+                child.material.forEach((mat) => {
+                  fixMaterial(mat);
+                });
               } else if (child.material) {
                 fixMaterial(child.material);
               }
             }
           });
 
-          // This GLB's lenses face -Z (Blender export convention).
-          // Rotate 180° around Y so lenses face +Z (toward camera).
-          glasses.rotation.y = Math.PI;
+          // The raw GLB is loaded. We will apply all rotation at the wrapper level
+          // based on MediaPipe's 3D matrix.
 
           // CRITICAL: force-update the world matrix so Box3.setFromObject sees
           // the post-rotation extents, not the stale pre-rotation state.
           glasses.updateMatrixWorld(true);
 
-          // Compute bounding box in post-rotation world space.
-          // After rotation.y = PI:  box.max.z = lens surface (toward camera)
-          //                         box.min.z = temple tips (into head)
+          // Compute bounding box just to get the natural width for scaling and heuristics
           const box = new THREE.Box3().setFromObject(glasses);
+          const size = box.getSize(new THREE.Vector3());
           const center = box.getCenter(new THREE.Vector3());
-          const naturalWidth = box.max.x - box.min.x;
-          const naturalDepth = box.max.z - box.min.z;
-
-          // ─── Respect the model's origin ───────────────────────────────────
-          // The GLB origin has been set at the NOSE BRIDGE in Blender.
-          // Do NOT re-center — keep glasses.position at (0,0,0) so the
-          // wrapper origin = model origin = nose bridge pivot point.
-          // Lenses extend forward (+Z after rotation), temples extend
-          // backward (-Z) — exactly like real glasses on a face.
-          // glasses.position stays at (0,0,0)
-
+          const naturalWidth = size.x;
+          
+          const updatePivot = () => {
+            const autoCenter = false;
+            if (autoCenter) {
+              // Gen 2.5 Heuristic: 50% X, 30% Y (from top), 10% Z (from front)
+              glasses.position.x = -center.x;
+              glasses.position.y = -(box.max.y - (size.y * 0.3));
+              glasses.position.z = -(box.min.z + (size.z * 0.1));
+            } else {
+              // Trust the Blender model's perfect origin
+              glasses.position.set(0, 0, 0);
+            }
+          };
+          updatePivot();
+          window.addEventListener('modelPivotChanged', updatePivot);
+          
           // Wrap in a Group whose origin = model nose bridge
           const wrapper = new THREE.Group();
           wrapper.add(glasses);
+          
+          // ── Gen 3: Dynamic Custom Face Mask is handled in update loop ──
 
           wrapper.userData.naturalWidth = naturalWidth;
+
+          console.log('[TryOn] Model loaded — naturalWidth:', naturalWidth.toFixed(3));
 
           scene.add(wrapper);
           glassesModel = wrapper;
@@ -234,6 +328,10 @@
     if (!mat) return;
     mat.envMapIntensity = 1.0;
     mat.needsUpdate = true;
+    mat.renderOrder = 1;
+    mat.depthTest = true;
+    mat.clippingPlanes = [templeClipPlane];
+    mat.clipIntersection = false;
     if (mat.transparent) {
       mat.depthWrite = false;
     }
@@ -249,103 +347,133 @@
         delegate: 'GPU',
       },
       outputFaceBlendshapes: false,
-      outputFacialTransformationMatrixes: false,  // Not needed with landmark approach
+      outputFacialTransformationMatrixes: false, // Turned off to prevent internal tracker crashes when regaining face
       runningMode: 'VIDEO',
       numFaces: 1,
     });
   }
 
   // ─── Glasses transform update ───────────────────────────────────────────────
-  //
-  // APPROACH: Landmark-based rotation (no MediaPipe face matrix needed).
-  //
-  // We convert key face landmarks from MediaPipe's image-normalized coordinates
-  // (Y-down, [0,1]) to Three.js world coordinates (Y-up), then build the face's
-  // three orthonormal axes:
-  //
-  //   X axis  = left-eye → right-eye          (face horizontal)
-  //   Y axis  = chin → forehead               (face vertical / "up")
-  //   Z axis  = X × Y (cross product)         (face normal, toward camera)
-  //
-  // A rotation matrix built from these axes correctly orients the glasses to
-  // sit on the face regardless of head pose (yaw, pitch, roll), with no
-  // coordinate-system conversion ambiguity.
-  // ──────────────────────────────────────────────────────────────────────────
   function updateGlassesTransform(landmarks) {
-    if (!glassesModel || !landmarks || !landmarks.length) return;
+    if (!glassesModel || !landmarks) return;
 
-    const lm = landmarks;
+    // Read live calibration values
+    const SCALE_MULT = TUNE_SCALE;
+    const Y_OFFSET = TUNE_Y;
+    const X_OFFSET = TUNE_X;
+    const Z_OFFSET = TUNE_Z;
+    const Y_ANCHOR_BLEND = TUNE_BLEND;
 
-    // Visible world dimensions = camera frustum size (orthographic: 1 unit = 1 pixel)
-    const visWidth  = camera.right - camera.left;
-    const visHeight = camera.top - camera.bottom;
+    // Visible world dimensions for our camera depth
+    const Z_DEPTH = 100; 
+    const vFov = (camera.fov * Math.PI) / 180;
+    const visHeight = 2 * Math.tan(vFov / 2) * Z_DEPTH;
+    const visWidth = visHeight * camera.aspect;
 
-    // ── Convert MediaPipe landmark → Three.js world space ──────────────────
-    // MediaPipe: x,y in [0,1] image-normalized (Y-down), z = depth (rough scale)
-    // Three.js:  Y-up, camera at z=+2 looking in -Z direction
-    // Mirroring: when isMirrored=true (selfie cam), flip X so real-world left
-    //            stays on the left in the Three.js scene.
+    // Convert MediaPipe landmark -> Three.js world space
     const toW = (p) => new THREE.Vector3(
       ((isMirrored ? 1 - p.x : p.x) - 0.5) * visWidth,
       -(p.y - 0.5) * visHeight,
-      -(p.z * visWidth)
+      -(p.z * visWidth) - Z_DEPTH 
     );
 
-    // Key landmarks
-    const leftEyeW  = toW(lm[33]);   // left eye outer corner  (for rotation axis)
-    const rightEyeW = toW(lm[263]);  // right eye outer corner (for rotation axis)
-    const chinW     = toW(lm[152]);  // chin
-    const foreW     = toW(lm[9]);    // forehead
+    const lm = landmarks;
+    const leftEyeW = toW(lm[33]);
+    const rightEyeW = toW(lm[263]);
+    const pupilMidW = toW(lm[468]).add(toW(lm[473])).multiplyScalar(0.5);
+    const noseBridgeW = toW(lm[6]);
+    
+    // Face width at eye level
+    const leftCheekW = toW(lm[234]);
+    const rightCheekW = toW(lm[454]);
+    const cheekDist = leftCheekW.distanceTo(rightCheekW);
 
-    // Iris/pupil centers — the most accurate landmarks for lens placement
-    // lm[468] = left iris center, lm[473] = right iris center (MediaPipe 478-pt model)
-    const leftIrisW  = toW(lm[468]);
-    const rightIrisW = toW(lm[473]);
-
-    // Nose bridge landmarks:
-    // lm[168] = between inner eye corners (top of nose bridge)
-    // lm[6]   = lower nose bridge, where glasses nose pads actually rest
-    const nosePadW = toW(lm[6]);
 
     // ── Scale ────────────────────────────────────────────────────────────────
-    // Frame width ≈ 2.1 × interpupillary distance (IPD-based).
-    const pupilDist = leftIrisW.distanceTo(rightIrisW);
+    // User explicitly requested: "make the glasses width = face width at eyelevel"
+    const targetWidth = cheekDist * calibrationFactor;
     let S = 1;
     if (glassesModel.userData.naturalWidth > 0) {
-      S = (pupilDist * 2.1) / glassesModel.userData.naturalWidth;
+      S = targetWidth / glassesModel.userData.naturalWidth;
       glassesModel.scale.setScalar(S);
+      
+      // Custom mask is not a child of the glasses wrapper, so it does not need
+      // inverse scaling. It lives in the scene world space!
     }
 
-    // ── Rotation ─────────────────────────────────────────────────────────────
-    // Build face-aligned orthonormal basis from landmark world positions.
-
-    // X: left→right eye direction (face horizontal axis)
+    // Instead of relying on MediaPipe's black-box canonical matrix, which has
+    // caused endless handedness and orientation issues, we construct a mathematically
+    // perfect Right-Handed coordinate system directly from the physical 3D landmarks!
+    
+    // xAxis points from Left Eye to Right Eye (User's Right)
     const xAxis = rightEyeW.clone().sub(leftEyeW).normalize();
-
-    // Raw Y: chin→forehead (face vertical axis, approximate)
-    const yRaw  = foreW.clone().sub(chinW).normalize();
-
-    // Z: face normal toward camera = X cross rawY
-    const zAxis = new THREE.Vector3().crossVectors(xAxis, yRaw).normalize();
-
-    // Re-orthogonalize Y so it is exactly perpendicular to X and Z
-    const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
-
-    // Build and apply the rotation matrix
+    
+    // Instead of using Chin-to-Forehead (which swings wildly when tilting the head),
+    // we build the Z-axis directly from the Ears to the Nose Bridge.
+    // This physically locks the pitch so the temples always rest exactly on the ears!
+    const leftEarW = toW(lm[127]);  // Left ear top connection
+    const rightEarW = toW(lm[356]); // Right ear top connection
+    const earMidW = leftEarW.clone().add(rightEarW).multiplyScalar(0.5);
+    
+    // zRaw points Forward (From Ears to Eyes)
+    const eyeMidW = leftEyeW.clone().add(rightEyeW).multiplyScalar(0.5);
+    const zRaw = eyeMidW.clone().sub(earMidW).normalize();
+    
+    // yAxis points Up (Cross product of Z and X)
+    const yAxis = new THREE.Vector3().crossVectors(zRaw, xAxis).normalize();
+    
+    // Final zAxis perfectly orthogonal to X and Y
+    const zAxis = new THREE.Vector3().crossVectors(xAxis, yAxis).normalize();
+    
+    // Build the final, foolproof rotation matrix
     const rotMat = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
-    glassesModel.setRotationFromMatrix(rotMat);
+    glassesModel.quaternion.setFromRotationMatrix(rotMat);
+    
+    // Apply user-controlled model orientation fixes
+    glassesModel.rotateX(window.modelFixX);
+    glassesModel.rotateY(window.modelFixY);
+    glassesModel.rotateZ(window.modelFixZ);
 
-    // ── Position ────────────────────────────────────────────────────────────
-    // The model origin IS the nose bridge (set in Blender).
-    //
-    // X: pupil midpoint (horizontal centering)
-    // Y: lm[6] — the lower nose bridge where pads actually rest, NOT lm[168]
-    //    which is too high (between inner eye corners)
-    // Z: 0 — flat on the 2D video plane. The face is a flat image at z=0;
-    //    using landmark Z pushes glasses forward due to MediaPipe's relative
-    //    depth values, causing the "floating" gap. Z=0 eliminates this.
-    const pupilMidW = leftIrisW.clone().add(rightIrisW).multiplyScalar(0.5);
-    glassesModel.position.set(pupilMidW.x, nosePadW.y, 0);
+    // ── Position (Pixel-Perfect Anchoring) ───────────────────────────────────
+    const anchorY = noseBridgeW.y * (1 - Y_ANCHOR_BLEND) + pupilMidW.y * Y_ANCHOR_BLEND;
+    const finalX = noseBridgeW.x + X_OFFSET;
+    const finalY = anchorY + Y_OFFSET;
+    const finalZ = noseBridgeW.z;
+
+    // --- Dynamic Angled Clipping Plane ---
+    // Mathematically guarantees the far lens is NEVER sliced, while keeping the far temple hidden and growing the near temple.
+    const turnAmount = -xAxis.z; // Negative = turned right, Positive = turned left
+    const absTurn = Math.abs(turnAmount);
+    
+    const angleMultiplier = 1.6; 
+    const Nx = absTurn * angleMultiplier;
+    
+    // We want the far hinge (at x = +/- 0.45 * targetWidth) to always be cut at 15% depth.
+    // Solving the plane equation gives us the exact center depth needed to pivot around the far hinge:
+    const currentCut = 0.15 + 0.45 * Nx; 
+    
+    const dynamicNormal = zAxis.clone().sub(xAxis.clone().multiplyScalar(turnAmount * angleMultiplier)).normalize();
+    
+    const depthCut = -targetWidth * currentCut;
+    const cutoffPoint = new THREE.Vector3(finalX, finalY, finalZ).add(zAxis.clone().multiplyScalar(depthCut));
+
+    templeClipPlane.setFromNormalAndCoplanarPoint(dynamicNormal, cutoffPoint);
+
+    glassesModel.position.set(finalX, finalY, finalZ);
+
+    // Apply local Z offset (push into face)
+    // Since the matrix rotates the model to face the camera, 
+    // +Z points toward the camera and -Z points into the head.
+    // If we want Z_OFFSET to push glasses closer to face, we translate Z.
+    if (Z_OFFSET !== 0) {
+       glassesModel.translateZ(Z_OFFSET);
+    }
+
+    // Restore autoUpdate so Three.js handles the pos/quat/scale composition
+    glassesModel.matrixAutoUpdate = true;
+    
+    // ── Update 3D Face Mesh Occluder ─────────────────────────────────────────
+    updateOccluderMesh(lm, visWidth, visHeight, Z_DEPTH, turnAmount);
   }
 
   // ─── Resize handler ─────────────────────────────────────────────────────────
@@ -367,10 +495,7 @@
     }
 
     if (camera) {
-      camera.left   = -W / 2;
-      camera.right  =  W / 2;
-      camera.top    =  H / 2;
-      camera.bottom = -H / 2;
+      camera.aspect = aspect;
       camera.updateProjectionMatrix();
     }
   }
@@ -379,6 +504,7 @@
   let lastTimestamp = 0;
   const TARGET_FPS = 30;
   const FRAME_TIME = 1000 / TARGET_FPS;
+  let lastVideoTime = -1;
 
   function animate(timestamp) {
     animationId = requestAnimationFrame(animate);
@@ -400,25 +526,31 @@
       cameraCtx.restore();
     }
 
-    // Run face detection
+    // Run face detection (only on NEW video frames to prevent MediaPipe tracker corruption)
     if (faceLandmarker && video && video.readyState >= 2) {
       try {
-        const results = faceLandmarker.detectForVideo(video, performance.now());
+        if (video.currentTime !== lastVideoTime) {
+          lastVideoTime = video.currentTime;
+          const results = faceLandmarker.detectForVideo(video, performance.now());
 
-        if (results.faceLandmarks && results.faceLandmarks.length > 0) {
-          lastFaceDetectedTime = Date.now();
-          updateGlassesTransform(results.faceLandmarks[0]);
+          if (results.faceLandmarks && results.faceLandmarks.length > 0) {
+            lastFaceDetectedTime = Date.now();
+            updateGlassesTransform(results.faceLandmarks[0]);
 
-          if (glassesModel) glassesModel.visible = true;
-          if (callbacks.onFaceDetected) callbacks.onFaceDetected();
-        } else {
-          if (glassesModel) glassesModel.visible = false;
+            if (glassesModel) glassesModel.visible = true;
+            if (callbacks.onFaceDetected) callbacks.onFaceDetected();
+          } else {
+            if (glassesModel) glassesModel.visible = false;
 
-          const secondsWithoutFace = (Date.now() - lastFaceDetectedTime) / 1000;
-          if (callbacks.onNoFace) callbacks.onNoFace(secondsWithoutFace);
+            const secondsWithoutFace = (Date.now() - lastFaceDetectedTime) / 1000;
+            if (callbacks.onNoFace) callbacks.onNoFace(secondsWithoutFace);
+          }
         }
       } catch (e) {
-        // Suppress per-frame errors
+        if (!window.hasReportedArError) {
+          window.hasReportedArError = true;
+          if (callbacks.onError) callbacks.onError("Tracker Error: " + e.message);
+        }
       }
     }
 
@@ -459,6 +591,14 @@
       });
       scene?.remove(glassesModel);
       glassesModel = null;
+    }
+
+    if (occluderMesh) {
+      occluderGeometry?.dispose();
+      occluderMesh.material?.dispose();
+      scene?.remove(occluderMesh);
+      occluderMesh = null;
+      occluderGeometry = null;
     }
 
     if (renderer) {
@@ -559,11 +699,29 @@
     },
 
     setCalibration(value) {
-      calibrationFactor = parseFloat(value) || 1.8;
+      calibrationFactor = parseFloat(value) || 1.08;
     },
 
     setMirror(value) {
       isMirrored = Boolean(value);
+    },
+
+    // ── Live calibration from Console ──────────────────────────────────
+    // Usage: EyeleuxAR.tune({ scale: 1.2, y: -40, z: 20 })
+    //   scale : glasses width multiplier (default 1.2)
+    //   y     : vertical offset in pixels, negative = DOWN (default 0)
+    //   x     : horizontal offset in pixels, negative = LEFT (default 0)
+    //   z     : depth offset in pixels, positive = CLOSER TO FACE / INTO FACE (default 0)
+    //   blend : 0.0 = nose bridge, 1.0 = pupil midpoint (default 0.5)
+    // All parameters are optional — only pass what you want to change.
+    tune(opts = {}) {
+      if (opts.scale !== undefined) TUNE_SCALE = parseFloat(opts.scale);
+      if (opts.y     !== undefined) TUNE_Y     = parseFloat(opts.y);
+      if (opts.x     !== undefined) TUNE_X     = parseFloat(opts.x);
+      if (opts.z     !== undefined) TUNE_Z     = parseFloat(opts.z);
+      if (opts.blend !== undefined) TUNE_BLEND = parseFloat(opts.blend);
+      console.log('[TryOn] Current calibration:',
+        { scale: TUNE_SCALE, y: TUNE_Y, x: TUNE_X, z: TUNE_Z, blend: TUNE_BLEND });
     },
 
     cleanup,
