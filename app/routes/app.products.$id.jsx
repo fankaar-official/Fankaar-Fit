@@ -60,6 +60,11 @@ const GET_PRODUCT_QUERY = `#graphql
                 ... on GenericFile {
                   url
                 }
+                ... on Model3d {
+                  sources {
+                    url
+                  }
+                }
               }
               value
             }
@@ -129,7 +134,7 @@ export const loader = async ({ request, params }) => {
         sku: node.sku || "—",
         image: node.image?.url || product.featuredImage?.url || null,
         imageAlt: node.image?.altText || node.title,
-        glbUrl: node.metafield?.reference?.url || node.metafield?.value || null,
+        glbUrl: node.metafield?.reference?.url || node.metafield?.reference?.sources?.[0]?.url || node.metafield?.value || null,
         glbMetafieldId: node.metafield?.id || null,
       })),
     },
