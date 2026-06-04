@@ -54,18 +54,8 @@ const GET_PRODUCT_QUERY = `#graphql
               url
               altText
             }
-            metafield(namespace: "tryon", key: "model") {
+            metafield(namespace: "tryon", key: "glb_url") {
               id
-              reference {
-                ... on GenericFile {
-                  url
-                }
-                ... on Model3d {
-                  sources {
-                    url
-                  }
-                }
-              }
               value
             }
           }
@@ -134,7 +124,7 @@ export const loader = async ({ request, params }) => {
         sku: node.sku || "—",
         image: node.image?.url || product.featuredImage?.url || null,
         imageAlt: node.image?.altText || node.title,
-        glbUrl: node.metafield?.reference?.url || node.metafield?.reference?.sources?.[0]?.url || node.metafield?.value || null,
+        glbUrl: node.metafield?.value || null,
         glbMetafieldId: node.metafield?.id || null,
       })),
     },
@@ -201,10 +191,10 @@ export const action = async ({ request, params }) => {
 
     if (intent === "save-glb-url") {
       const variantId = formData.get("variantId");
-      const fileId = formData.get("fileId");
+      const glbUrl = formData.get("glbUrl");
 
-      if (!variantId || !fileId) {
-        return json({ error: "Missing variantId or fileId" }, { status: 400 });
+      if (!variantId || !glbUrl) {
+        return json({ error: "Missing variantId or glbUrl" }, { status: 400 });
       }
 
       try {
@@ -214,9 +204,9 @@ export const action = async ({ request, params }) => {
               {
                 ownerId: variantId,
                 namespace: "tryon",
-                key: "model",
-                type: "file_reference",
-                value: fileId,
+                key: "glb_url",
+                type: "url",
+                value: glbUrl,
               },
             ],
           },
@@ -371,12 +361,12 @@ export default function ProductTryOnManager() {
 
         setUploadProgress(90);
 
-        // Step 4: Save file ID to variant metafield
+        // Step 4: Save CDN URL to variant metafield
         const finalUrl = regData.cdnUrl || resourceUrl;
         const metaForm = new FormData();
         metaForm.set("intent", "save-glb-url");
         metaForm.set("variantId", variant.id);
-        metaForm.set("fileId", regData.fileId || resourceUrl); // Wait, if fileId is null? It shouldn't be. 
+        metaForm.set("glbUrl", finalUrl);
         await fetcher.submit(metaForm, { method: "post" });
 
         // Update local state

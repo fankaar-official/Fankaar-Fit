@@ -32,6 +32,12 @@ const FILE_CREATE = `#graphql
           originalFileSize
           createdAt
         }
+        ... on Model3d {
+          id
+          sources {
+            url
+          }
+        }
       }
       userErrors {
         field
@@ -123,7 +129,10 @@ export const action = async ({ request }) => {
       }
 
       const createdFile = fileData.data.fileCreate.files[0];
-      const cdnUrl = createdFile?.url || resourceUrl;
+      let cdnUrl = createdFile?.url || resourceUrl;
+      if (createdFile?.sources?.length > 0) {
+        cdnUrl = createdFile.sources[0].url;
+      }
 
       return json({ success: true, cdnUrl, fileId: createdFile?.id });
     } catch (err) {
