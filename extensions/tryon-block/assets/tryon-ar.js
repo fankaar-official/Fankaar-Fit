@@ -55,7 +55,7 @@
   // ║  Changes take effect INSTANTLY — no redeploy needed!               ║
   // ╚══════════════════════════════════════════════════════════════════════╝
   let TUNE_SCALE  = 1.2;   // Glasses width multiplier (1.0 = eye width, 1.2 = 20% wider)
-  let TUNE_Y      = 0;     // Y offset in pixels (negative = DOWN toward nose)
+  let TUNE_Y      = -25;   // Y offset in pixels (negative = DOWN toward nose)
   let TUNE_X      = 0;     // X offset in pixels (negative = LEFT)
   let TUNE_Z      = 0;     // Z offset (negative = push INTO face, positive = pull AWAY)
   let TUNE_BLEND  = 0.5;   // Y anchor: 0.0 = nose bridge, 1.0 = pupil midpoint
