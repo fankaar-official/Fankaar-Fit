@@ -205,7 +205,7 @@ export const action = async ({ request, params }) => {
                 ownerId: variantId,
                 namespace: "tryon",
                 key: "glb_url",
-                type: "url",
+                type: "single_line_text_field",
                 value: glbUrl,
               },
             ],
