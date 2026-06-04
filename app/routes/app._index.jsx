@@ -129,6 +129,7 @@ export default function ProductsIndex() {
           key={id}
           selected={selectedResources.includes(id)}
           position={index}
+          onClick={() => navigate(`/app/products/${productId}`)}
         >
           <IndexTable.Cell>
             <Thumbnail
