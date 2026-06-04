@@ -10,7 +10,12 @@
 {% endcomment %}
 
 {% assign tryon_enabled = product.metafields.tryon.enabled.value %}
-{% assign variant_glb_url = product.selected_or_first_available_variant.metafields.tryon.glb_url.value %}
+{% assign variant_glb_url = '' %}
+{% if product.selected_or_first_available_variant.metafields.tryon.glb_url.type == 'file_reference' %}
+  {% assign variant_glb_url = product.selected_or_first_available_variant.metafields.tryon.glb_url.value.url %}
+{% else %}
+  {% assign variant_glb_url = product.selected_or_first_available_variant.metafields.tryon.glb_url.value %}
+{% endif %}
 
 <div
   id="eyeleux-tryon-container"
@@ -97,16 +102,28 @@
   window.__eyeleux = window.__eyeleux || {};
   window.__eyeleux.variantGlbUrls = {
     {% for variant in product.variants %}
-      "{{ variant.id }}": "{{ variant.metafields.tryon.glb_url.value | default: '' }}"{% unless forloop.last %},{% endunless %}
+      {% assign v_url = '' %}
+      {% if variant.metafields.tryon.glb_url.type == 'file_reference' %}
+        {% assign v_url = variant.metafields.tryon.glb_url.value.url %}
+      {% else %}
+        {% assign v_url = variant.metafields.tryon.glb_url.value %}
+      {% endif %}
+      "{{ variant.id }}": "{{ v_url | default: '' }}"{% unless forloop.last %},{% endunless %}
     {% endfor %}
   };
   window.__eyeleux.variants = [
     {% for variant in product.variants %}
+      {% assign v_url = '' %}
+      {% if variant.metafields.tryon.glb_url.type == 'file_reference' %}
+        {% assign v_url = variant.metafields.tryon.glb_url.value.url %}
+      {% else %}
+        {% assign v_url = variant.metafields.tryon.glb_url.value %}
+      {% endif %}
       {
         "id": "{{ variant.id }}",
         "title": {{ variant.title | json }},
         "image": "{{ variant.featured_image.src | image_url: width: 100 | default: '' }}",
-        "glbUrl": "{{ variant.metafields.tryon.glb_url.value | default: '' }}"
+        "glbUrl": "{{ v_url | default: '' }}"
       }{% unless forloop.last %},{% endunless %}
     {% endfor %}
   ];
