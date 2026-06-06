@@ -362,8 +362,38 @@ export default function ProductTryOnManager() {
 
         setUploadProgress(90);
 
-        // Step 4: Save CDN URL to variant metafield
-        const finalUrl = regData.cdnUrl || resourceUrl;
+        // Step 3.5: Poll until Shopify processing is complete and CDN URL is available
+        setUploadProgress(90);
+        const { fileId } = regData;
+        let finalUrl = null;
+        
+        for (let i = 0; i < 20; i++) {
+          const statusRes = await fetch("/api/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ step: "check-status", fileId }),
+          });
+          const statusData = await statusRes.json();
+          if (statusData.error) throw new Error(statusData.error);
+
+          if (statusData.status === "READY" && statusData.cdnUrl) {
+            finalUrl = statusData.cdnUrl;
+            break;
+          }
+          if (statusData.status === "FAILED") {
+            throw new Error("Shopify failed to process the 3D model.");
+          }
+          // wait 1.5 seconds before checking again
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+
+        if (!finalUrl) {
+          throw new Error("Timeout waiting for Shopify to process the file. The file might be too complex.");
+        }
+
+        setUploadProgress(95);
+
+        // Step 4: Save permanent CDN URL to variant metafield
         const metaForm = new FormData();
         metaForm.set("intent", "save-glb-url");
         metaForm.set("variantId", variant.id);

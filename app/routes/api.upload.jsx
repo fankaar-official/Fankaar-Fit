@@ -141,5 +141,50 @@ export const action = async ({ request }) => {
     }
   }
 
-  return json({ error: "Invalid step. Use 'get-upload-url' or 'register-file'" }, { status: 400 });
+  // ── STEP 3: Poll File Status to get permanent CDN URL ────────────────────
+  if (step === "check-status") {
+    const { fileId } = body;
+    if (!fileId) return json({ error: "fileId required" }, { status: 400 });
+
+    try {
+      const statusRes = await admin.graphql(`#graphql
+        query CheckFile($id: ID!) {
+          node(id: $id) {
+            ... on GenericFile {
+              fileStatus
+              url
+            }
+            ... on Model3d {
+              fileStatus
+              sources {
+                url
+              }
+            }
+          }
+        }
+      `, { variables: { id: fileId } });
+      const statusData = await statusRes.json();
+      const fileNode = statusData.data?.node;
+
+      if (!fileNode) {
+        return json({ error: "File not found during polling" });
+      }
+
+      let cdnUrl = fileNode.url;
+      if (fileNode.sources?.length > 0) {
+        cdnUrl = fileNode.sources[0].url;
+      }
+
+      return json({
+        success: true,
+        status: fileNode.fileStatus,
+        cdnUrl: cdnUrl || null,
+      });
+    } catch (err) {
+      console.error("Check status error:", err);
+      return json({ error: err.message }, { status: 500 });
+    }
+  }
+
+  return json({ error: "Invalid step. Use 'get-upload-url', 'register-file', or 'check-status'" }, { status: 400 });
 };
