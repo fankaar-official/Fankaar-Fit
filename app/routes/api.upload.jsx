@@ -36,6 +36,7 @@ const FILE_CREATE = `#graphql
           id
           sources {
             url
+            format
           }
         }
       }
@@ -131,7 +132,10 @@ export const action = async ({ request }) => {
       const createdFile = fileData.data.fileCreate.files[0];
       let cdnUrl = createdFile?.url || resourceUrl;
       if (createdFile?.sources?.length > 0) {
-        cdnUrl = createdFile.sources[0].url;
+        const glbSource = createdFile.sources.find(s => 
+          (s.format && s.format.toUpperCase() === "GLB") || s.url.toLowerCase().includes(".glb")
+        );
+        cdnUrl = glbSource ? glbSource.url : createdFile.sources[0].url;
       }
 
       return json({ success: true, cdnUrl, fileId: createdFile?.id });
@@ -160,6 +164,7 @@ export const action = async ({ request }) => {
               fileErrors { message }
               sources {
                 url
+                format
               }
             }
           }
@@ -174,7 +179,10 @@ export const action = async ({ request }) => {
 
       let cdnUrl = fileNode.url;
       if (fileNode.sources?.length > 0) {
-        cdnUrl = fileNode.sources[0].url;
+        const glbSource = fileNode.sources.find(s => 
+          (s.format && s.format.toUpperCase() === "GLB") || s.url.toLowerCase().includes(".glb")
+        );
+        cdnUrl = glbSource ? glbSource.url : fileNode.sources[0].url;
       }
 
       let errorMsg = null;
