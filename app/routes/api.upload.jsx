@@ -77,7 +77,7 @@ export const action = async ({ request }) => {
               filename,
               mimeType: "model/gltf-binary",
               httpMethod: "PUT",
-              resource: "FILE",
+              resource: "MODEL_3D",
               fileSize: String(fileSize),
             },
           ],
@@ -117,7 +117,7 @@ export const action = async ({ request }) => {
             {
               originalSource: resourceUrl,
               filename,
-              contentType: "FILE",
+              contentType: "MODEL_3D",
             },
           ],
         },
@@ -152,10 +152,12 @@ export const action = async ({ request }) => {
           node(id: $id) {
             ... on GenericFile {
               fileStatus
+              fileErrors { message }
               url
             }
             ... on Model3d {
               fileStatus
+              fileErrors { message }
               sources {
                 url
               }
@@ -175,10 +177,16 @@ export const action = async ({ request }) => {
         cdnUrl = fileNode.sources[0].url;
       }
 
+      let errorMsg = null;
+      if (fileNode.fileErrors && fileNode.fileErrors.length > 0) {
+        errorMsg = fileNode.fileErrors.map(e => e.message).join(", ");
+      }
+
       return json({
         success: true,
         status: fileNode.fileStatus,
         cdnUrl: cdnUrl || null,
+        errorMsg: errorMsg
       });
     } catch (err) {
       console.error("Check status error:", err);

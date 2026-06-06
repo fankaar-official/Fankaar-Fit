@@ -381,7 +381,7 @@ export default function ProductTryOnManager() {
             break;
           }
           if (statusData.status === "FAILED") {
-            throw new Error("Shopify failed to process the 3D model.");
+            throw new Error("Shopify failed to process the 3D model. " + (statusData.errorMsg || ""));
           }
           // wait 1.5 seconds before checking again
           await new Promise((r) => setTimeout(r, 1500));
