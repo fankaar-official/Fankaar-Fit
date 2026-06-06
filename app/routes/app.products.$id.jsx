@@ -331,17 +331,11 @@ export default function ProductTryOnManager() {
         const urlData = await urlRes.json();
         if (urlData.error) throw new Error(urlData.error);
 
-        // Step 2: Upload file DIRECTLY from browser to Shopify's CDN via PUT
+        // Step 2: Upload file DIRECTLY from browser to Shopify's CDN via POST
         setUploadProgress(10);
         const { url: uploadUrl, resourceUrl, parameters } = urlData;
 
-        // For PUT uploads, parameters go as request headers
-        const headers = {};
-        for (const param of parameters) {
-          headers[param.name] = param.value;
-        }
-
-        await uploadDirectToShopify(uploadUrl, file, headers, (pct) => {
+        await uploadDirectToShopify(uploadUrl, file, parameters, (pct) => {
           // Map 10-80% range for the actual upload
           setUploadProgress(10 + Math.round(pct * 0.7));
         });
@@ -669,7 +663,7 @@ export default function ProductTryOnManager() {
 
 // ─── Upload directly to Shopify's CDN with XHR progress ──────────────────────
 
-function uploadDirectToShopify(url, file, headers, onProgress) {
+function uploadDirectToShopify(url, file, parameters, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.upload.addEventListener("progress", (e) => {
@@ -687,13 +681,19 @@ function uploadDirectToShopify(url, file, headers, onProgress) {
       }
     });
     xhr.addEventListener("error", () => reject(new Error("Network error during upload to Shopify")));
-    xhr.open("PUT", url);
-    // Set headers from Shopify's staged upload parameters
-    for (const [key, value] of Object.entries(headers)) {
-      xhr.setRequestHeader(key, value);
+    
+    xhr.open("POST", url);
+    
+    const formData = new FormData();
+    // Shopify parameters must be added BEFORE the file
+    if (parameters) {
+      parameters.forEach((param) => {
+        formData.append(param.name, param.value);
+      });
     }
-    xhr.setRequestHeader("Content-Type", "model/gltf-binary");
-    xhr.send(file);  // Send raw file bytes — no multipart overhead
+    formData.append("file", file);
+    
+    xhr.send(formData);
   });
 }
 
