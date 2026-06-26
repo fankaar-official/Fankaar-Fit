@@ -319,7 +319,6 @@
       + '#eyeleux-footer { position:absolute;bottom:' + (carouselHTML ? '135' : '20') + 'px;left:0;right:0;padding:20px;display:flex;flex-direction:column;align-items:center;gap:12px;z-index:30; }'
       + '#eyeleux-instruction { color:rgba(255,255,255,0.9);font-size:14px;background:rgba(0,0,0,0.4);padding:8px 16px;border-radius:20px;text-align:center;transition:opacity 0.5s; }'
       + '#eyeleux-tryon-close { background:rgba(255,255,255,0.15);border:none;color:#fff;width:40px;height:40px;min-width:40px;min-height:40px;padding:0;margin:0;box-sizing:border-box;line-height:1;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px); }'
-      + '#eyeleux-mirror-btn { background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;cursor:pointer;backdrop-filter:blur(4px); }'
       + '#eyeleux-error-overlay { position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.9);z-index:40;gap:16px;padding:24px; }'
       + '#eyeleux-error-overlay.visible { display:flex; }'
       + '#eyeleux-error-msg { color:#fff;font-size:15px;text-align:center;max-width:300px; }'
@@ -370,7 +369,6 @@
       // Footer
       + '<div id="eyeleux-footer">'
       + '<div id="eyeleux-instruction">📍 Position glasses on your face</div>'
-      + '<button id="eyeleux-mirror-btn">🔄 Mirror</button>'
       + '</div>'
 
       // Dev calibration panel
@@ -404,13 +402,6 @@
     document.getElementById('eyeleux-retry-btn').addEventListener('click', function() {
       hideError();
       initAR();
-    });
-
-    // ── Mirror toggle ──────────────────────────────────────────────────────
-    var mirrored = true;
-    document.getElementById('eyeleux-mirror-btn').addEventListener('click', function() {
-      mirrored = !mirrored;
-      if (window.__eyeleuxAR?.setMirror) window.__eyeleuxAR.setMirror(mirrored);
     });
 
     // ── Calibration slider ─────────────────────────────────────────────────

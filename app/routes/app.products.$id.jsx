@@ -24,6 +24,7 @@ import {
   Frame,
   Box,
   Icon,
+  Select,
 } from "@shopify/polaris";
 import { CheckIcon, AlertTriangleIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
@@ -277,11 +278,21 @@ export default function ProductTryOnManager() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState(null);
   const [previewGlbUrl, setPreviewGlbUrl] = useState(null);
+  const [linkingVariantId, setLinkingVariantId] = useState(null);
+  const [selectedGlbToLink, setSelectedGlbToLink] = useState("");
   const [toast, setToast] = useState(null);
   const fileInputRef = useRef(null);
   const currentVariantForUpload = useRef(null);
 
   const isLoading = navigation.state !== "idle";
+
+  // Unique uploaded GLBs for the dropdown
+  const uploadedGlbs = variants
+    .filter((v) => v.glbUrl)
+    .map((v) => ({
+      label: v.title,
+      value: v.glbUrl,
+    }));
 
   // ── Toggle save ──────────────────────────────────────────────────────────
   const handleSaveEnabled = useCallback(() => {
@@ -432,6 +443,28 @@ export default function ProductTryOnManager() {
     },
     [fetcher]
   );
+
+  const handleLinkGlb = useCallback(() => {
+    if (!linkingVariantId || !selectedGlbToLink) return;
+
+    const variant = variants.find(v => v.id === linkingVariantId);
+    if (!variant) return;
+
+    const form = new FormData();
+    form.set("intent", "save-glb-url");
+    form.set("variantId", linkingVariantId);
+    form.set("glbUrl", selectedGlbToLink);
+    fetcher.submit(form, { method: "post" });
+
+    setVariants((prev) =>
+      prev.map((v) =>
+        v.id === linkingVariantId ? { ...v, glbUrl: selectedGlbToLink } : v
+      )
+    );
+    setToast(`Linked existing GLB to "${variant.title}"!`);
+    setLinkingVariantId(null);
+    setSelectedGlbToLink("");
+  }, [linkingVariantId, selectedGlbToLink, variants, fetcher]);
 
   return (
     <Frame>
@@ -632,13 +665,37 @@ export default function ProductTryOnManager() {
                               </>
                             )}
 
-                            <Button
-                              variant={variant.glbUrl ? "plain" : "secondary"}
-                              onClick={() => handleUploadClick(variant)}
-                              disabled={uploadingVariantId !== null}
-                            >
-                              {variant.glbUrl ? "Replace GLB" : "Upload GLB"}
-                            </Button>
+                            {variant.glbUrl ? (
+                              <Button
+                                variant="plain"
+                                onClick={() => handleUploadClick(variant)}
+                                disabled={uploadingVariantId !== null}
+                              >
+                                Replace GLB
+                              </Button>
+                            ) : (
+                              <InlineStack gap="200">
+                                {uploadedGlbs.length > 0 && (
+                                  <Button
+                                    variant="plain"
+                                    onClick={() => {
+                                      setLinkingVariantId(variant.id);
+                                      setSelectedGlbToLink(uploadedGlbs[0].value);
+                                    }}
+                                    disabled={uploadingVariantId !== null}
+                                  >
+                                    Link Existing
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="secondary"
+                                  onClick={() => handleUploadClick(variant)}
+                                  disabled={uploadingVariantId !== null}
+                                >
+                                  Upload GLB
+                                </Button>
+                              </InlineStack>
+                            )}
                           </>
                         )}
                       </InlineStack>
@@ -657,6 +714,32 @@ export default function ProductTryOnManager() {
         glbUrl={previewGlbUrl}
         onClose={() => setPreviewGlbUrl(null)}
       />
+
+      {/* Link Existing Modal */}
+      <Modal
+        open={linkingVariantId !== null}
+        onClose={() => setLinkingVariantId(null)}
+        title="Link Existing 3D Model"
+        primaryAction={{
+          content: "Link Model",
+          onAction: handleLinkGlb,
+        }}
+        secondaryActions={[
+          {
+            content: "Cancel",
+            onAction: () => setLinkingVariantId(null),
+          },
+        ]}
+      >
+        <Modal.Section>
+          <Select
+            label="Choose an already uploaded model from another variant"
+            options={uploadedGlbs}
+            onChange={setSelectedGlbToLink}
+            value={selectedGlbToLink}
+          />
+        </Modal.Section>
+      </Modal>
     </Frame>
   );
 }
