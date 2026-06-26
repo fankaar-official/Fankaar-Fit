@@ -33,7 +33,18 @@
   // ─── Get variants with GLB files ───────────────────────────────────────────
   function getVariantsWithGlb() {
     const variants = window.__eyeleux?.variants || [];
-    return variants.filter(function(v) { return v.glbUrl && v.glbUrl.trim(); });
+    const withGlb = variants.filter(function(v) { return v.glbUrl && v.glbUrl.trim(); });
+    
+    // Deduplicate by glbUrl so we only show one thumbnail per unique 3D model
+    const unique = [];
+    const seen = new Set();
+    for (var i = 0; i < withGlb.length; i++) {
+      if (!seen.has(withGlb[i].glbUrl)) {
+        seen.add(withGlb[i].glbUrl);
+        unique.push(withGlb[i]);
+      }
+    }
+    return unique;
   }
 
   // ─── Update buttons visibility based on GLB availability ───────────────────
