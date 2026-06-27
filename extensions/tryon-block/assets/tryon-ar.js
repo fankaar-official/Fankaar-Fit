@@ -19,6 +19,9 @@
     THREE: 'https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js',
     GLTF_LOADER: 'https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/loaders/GLTFLoader.js',
     ROOM_ENV: 'https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/environments/RoomEnvironment.js',
+    RGBE_LOADER: 'https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/loaders/RGBELoader.js',
+    // Studio Neutral HDR from Khronos — same HDR used by the official glTF Sample Viewer
+    HDR_ENV_URL: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Viewer/refs/heads/main/assets/environments/neutral.hdr',
     MEDIAPIPE_VISION: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/vision_bundle.mjs',
     MEDIAPIPE_WASM: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/wasm',
     FACE_LANDMARKER_MODEL: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
@@ -28,6 +31,7 @@
   let THREE = null;
   let GLTFLoader = null;
   let RoomEnvironment = null;
+  let RGBELoader = null;
   let FaceLandmarker = null;
   let FilesetResolver = null;
 
@@ -89,6 +93,9 @@
 
       const envModule = await loadESModule(CDN.ROOM_ENV);
       RoomEnvironment = envModule.RoomEnvironment;
+
+      const rgbeModule = await loadESModule(CDN.RGBE_LOADER);
+      RGBELoader = rgbeModule.RGBELoader;
     })();
     return threePromise;
   }
@@ -202,7 +209,7 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2;
+    renderer.toneMappingExposure = 1.0;
     renderer.shadowMap.enabled = false;
     renderer.sortObjects = true;
     renderer.localClippingEnabled = true;
@@ -237,11 +244,38 @@
     dirLight2.position.set(-0.5, -0.5, 0.5);
     scene.add(dirLight2);
 
+    // Load studio HDR environment — same as the official glTF Sample Viewer
+    // so metals look identical to what is seen there.
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     pmremGenerator.compileEquirectangularShader();
-    const envTexture = pmremGenerator.fromScene(new RoomEnvironment()).texture;
-    scene.environment = envTexture;
-    pmremGenerator.dispose();
+
+    function applyRoomEnvFallback() {
+      const envTexture = pmremGenerator.fromScene(new RoomEnvironment()).texture;
+      scene.environment = envTexture;
+      pmremGenerator.dispose();
+    }
+
+    if (RGBELoader) {
+      new RGBELoader()
+        .setDataType(THREE.HalfFloatType)
+        .load(
+          CDN.HDR_ENV_URL,
+          (hdrTexture) => {
+            const envTexture = pmremGenerator.fromEquirectangular(hdrTexture).texture;
+            hdrTexture.dispose();
+            pmremGenerator.dispose();
+            scene.environment = envTexture;
+            console.log('[EyeLeux] HDR studio environment loaded ✓');
+          },
+          undefined,
+          (err) => {
+            console.warn('[EyeLeux] HDR load failed, falling back to RoomEnvironment:', err);
+            applyRoomEnvFallback();
+          }
+        );
+    } else {
+      applyRoomEnvFallback();
+    }
 
     renderer.setSize(W, H);
     
@@ -326,7 +360,12 @@
 
   function fixMaterial(mat) {
     if (!mat) return;
-    mat.envMapIntensity = 1.0;
+
+    // For highly metallic materials (metal >= 0.7), boost env map intensity
+    // so they show rich reflections matching Blender / the Khronos glTF Sample Viewer.
+    const isMetal = (mat.metalness ?? 0) >= 0.7;
+    mat.envMapIntensity = isMetal ? 2.5 : 1.0;
+
     mat.needsUpdate = true;
     mat.renderOrder = 1;
     mat.depthTest = true;
