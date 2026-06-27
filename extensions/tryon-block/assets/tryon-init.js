@@ -225,7 +225,7 @@
       + '</div>'
 
       // Model viewer
-      + '<model-viewer id="eyeleux-mv" src="' + escapeHtml(glbUrl) + '" alt="3D view of ' + escapeHtml(productTitle) + '" orientation="180deg 0 0" camera-orbit="180deg 75deg 105%" auto-rotate camera-controls shadow-intensity="1" environment-image="neutral" exposure="1" ar ar-modes="webxr scene-viewer quick-look" style="width:100vw;height:100vh;background:transparent;">'
+      + '<model-viewer id="eyeleux-mv" src="' + escapeHtml(glbUrl) + '" alt="3D view of ' + escapeHtml(productTitle) + '" orientation="180deg 0 0" camera-orbit="180deg 75deg 105%" auto-rotate camera-controls shadow-intensity="1" environment-image="https://modelviewer.dev/shared-assets/environments/neutral.hdr" tone-mapping="aces" exposure="1.2" ar ar-modes="webxr scene-viewer quick-look" style="width:100vw;height:100vh;background:transparent;">'
       + '  <div slot="progress-bar" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-weight:600;font-size:14px;background:rgba(0,0,0,0.6);padding:10px 20px;border-radius:20px;display:flex;align-items:center;gap:10px;backdrop-filter:blur(4px);">'
       + '    <svg style="width:18px;height:18px;animation:eyeleuxSpin 1s linear infinite;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-dashoffset="0"></circle></svg>'
       + '    Loading Model...'
