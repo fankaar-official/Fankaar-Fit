@@ -201,11 +201,11 @@
   function setupThreeScene() {
     renderer = new THREE.WebGLRenderer({
       canvas: threeCanvas,
-      alpha: true,
+      alpha: false,       // Opaque — Three.js now renders the full scene including video background
       antialias: true,
       premultipliedAlpha: false,
     });
-    renderer.setClearColor(0x000000, 0);
+    renderer.setClearColor(0x000000, 1);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -233,14 +233,17 @@
     
     scene = new THREE.Scene();
 
-    ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // Keep ambient low so it doesn't overpower environment-based reflections on metals
+    ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
     scene.add(ambientLight);
 
-    dirLight1 = new THREE.DirectionalLight(0xffffff, 1.2);
+    // Key light (top-right, warm)
+    dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
     dirLight1.position.set(0.5, 1, 1);
     scene.add(dirLight1);
 
-    dirLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+    // Fill light (bottom-left, cool)
+    dirLight2 = new THREE.DirectionalLight(0xccddff, 0.25);
     dirLight2.position.set(-0.5, -0.5, 0.5);
     scene.add(dirLight2);
 
@@ -361,10 +364,21 @@
   function fixMaterial(mat) {
     if (!mat) return;
 
-    // For highly metallic materials (metal >= 0.7), boost env map intensity
-    // so they show rich reflections matching Blender / the Khronos glTF Sample Viewer.
-    const isMetal = (mat.metalness ?? 0) >= 0.7;
-    mat.envMapIntensity = isMetal ? 2.5 : 1.0;
+    const metalness = mat.metalness ?? 0;
+    const isMetal = metalness >= 0.5;
+
+    if (isMetal) {
+      // Prevent perfect-mirror (roughness=0) which reflects pure transparent background.
+      // A minimum roughness of 0.08 gives visible, realistic reflections with contrast
+      // — this is exactly what Blender's Principled BSDF does by default for metal.
+      if ((mat.roughness ?? 1) < 0.08) {
+        mat.roughness = 0.08;
+      }
+      // Boost env map so HDR reflections are vivid but not blown out
+      mat.envMapIntensity = 1.8;
+    } else {
+      mat.envMapIntensity = 1.0;
+    }
 
     mat.needsUpdate = true;
     mat.renderOrder = 1;
@@ -594,7 +608,19 @@
     }
 
     // Render Three.js scene
+    // The camera canvas is used as scene.background so metals can reflect the real room.
+    // This also means we draw the video feed entirely inside Three.js (single canvas).
     if (renderer && scene && camera) {
+      if (cameraCanvas) {
+        if (!scene.background) {
+          // First frame: create the CanvasTexture and hide the separate camera canvas
+          scene.background = new THREE.CanvasTexture(cameraCanvas);
+          // Hide the separate camera canvas — Three.js now renders the video
+          if (cameraCanvas.style) cameraCanvas.style.display = 'none';
+        } else if (scene.background.isCanvasTexture) {
+          scene.background.needsUpdate = true;
+        }
+      }
       renderer.render(scene, camera);
     }
   }
