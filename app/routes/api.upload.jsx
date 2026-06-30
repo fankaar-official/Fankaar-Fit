@@ -130,13 +130,20 @@ export const action = async ({ request }) => {
       }
 
       const createdFile = fileData.data.fileCreate.files[0];
-      let cdnUrl = createdFile?.url || resourceUrl;
+      // Always prefer the original GLB source — never fall back to USDZ
+      // which has a different coordinate system and would break positioning.
+      let cdnUrl = null;
       if (createdFile?.sources?.length > 0) {
-        const glbSource = createdFile.sources.find(s => 
-          (s.format && s.format.toUpperCase() === "GLB") || s.url.toLowerCase().includes(".glb")
+        const glbSource = createdFile.sources.find(s =>
+          s.format && s.format.toUpperCase() === 'GLB'
+        ) || createdFile.sources.find(s =>
+          s.url && s.url.toLowerCase().includes('.glb')
         );
-        cdnUrl = glbSource ? glbSource.url : createdFile.sources[0].url;
+        cdnUrl = glbSource ? glbSource.url : null;
       }
+      // Fall back to the raw resource URL (the original staged upload) —
+      // this is always the user's original .glb file, not a Shopify conversion.
+      if (!cdnUrl) cdnUrl = createdFile?.url || resourceUrl;
 
       return json({ success: true, cdnUrl, fileId: createdFile?.id });
     } catch (err) {
@@ -177,13 +184,19 @@ export const action = async ({ request }) => {
         return json({ error: "File not found during polling" });
       }
 
-      let cdnUrl = fileNode.url;
+      let cdnUrl = null;
       if (fileNode.sources?.length > 0) {
-        const glbSource = fileNode.sources.find(s => 
-          (s.format && s.format.toUpperCase() === "GLB") || s.url.toLowerCase().includes(".glb")
+        // Strictly prefer GLB format — never pick USDZ or other conversions
+        // as they use different coordinate systems and break model positioning.
+        const glbSource = fileNode.sources.find(s =>
+          s.format && s.format.toUpperCase() === 'GLB'
+        ) || fileNode.sources.find(s =>
+          s.url && s.url.toLowerCase().includes('.glb')
         );
-        cdnUrl = glbSource ? glbSource.url : fileNode.sources[0].url;
+        cdnUrl = glbSource ? glbSource.url : null;
       }
+      // Final fallback: use the GenericFile url (always the original upload)
+      if (!cdnUrl) cdnUrl = fileNode.url;
 
       let errorMsg = null;
       if (fileNode.fileErrors && fileNode.fileErrors.length > 0) {
