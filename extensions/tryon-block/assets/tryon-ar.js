@@ -329,10 +329,9 @@
           const updatePivot = () => {
             const autoCenter = false;
             if (autoCenter) {
-              // Gen 2.5 Heuristic: 50% X, 30% Y (from top), 10% Z (from front)
               glasses.position.x = -center.x;
-              glasses.position.y = -(box.max.y - (size.y * 0.3));
-              glasses.position.z = -(box.min.z + (size.z * 0.1));
+              glasses.position.y = -(box.max.y - (size.y * 0.35));
+              glasses.position.z = -(box.min.z + (size.z * 0.05));
             } else {
               // Trust the Blender model's perfect origin
               glasses.position.set(0, 0, 0);
