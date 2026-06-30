@@ -310,14 +310,12 @@
               } else if (child.material) {
                 fixMaterial(child.material);
               }
+              }
             }
           });
 
-          // The raw GLB is loaded. 
-          // FIX: Shopify's MODEL_3D pipeline bakes and strips the 180-degree rotation 
-          // from the user's Empty node, but keeps the vertices relative to the origin.
-          // We restore the rotation here so the glasses pivot perfectly on the nose bridge.
-          glasses.rotation.x = Math.PI;
+          // The raw GLB is loaded. We will apply all rotation at the wrapper level
+          // based on MediaPipe's 3D matrix.
 
           // CRITICAL: force-update the world matrix so Box3.setFromObject sees
           // the post-rotation extents, not the stale pre-rotation state.

@@ -765,18 +765,23 @@ function uploadDirectToShopify(url, file, parameters, onProgress) {
     });
     xhr.addEventListener("error", () => reject(new Error("Network error during upload to Shopify")));
     
-    xhr.open("POST", url);
-    
-    const formData = new FormData();
-    // Shopify parameters must be added BEFORE the file
-    if (parameters) {
+    // If parameters exist, it's a POST with FormData (S3/GCP style form upload)
+    if (parameters && parameters.length > 0) {
+      xhr.open("POST", url);
+      const formData = new FormData();
       parameters.forEach((param) => {
         formData.append(param.name, param.value);
       });
+      formData.append("file", file);
+      xhr.send(formData);
+    } else {
+      // If no parameters, it's a direct PUT request of the raw file binary.
+      // CRITICAL: Content-Type must exactly match the mimeType sent to stagedUploadsCreate
+      // otherwise Google Cloud Storage rejects it with SignatureDoesNotMatch.
+      xhr.open("PUT", url);
+      xhr.setRequestHeader("Content-Type", "model/gltf-binary");
+      xhr.send(file);
     }
-    formData.append("file", file);
-    
-    xhr.send(formData);
   });
 }
 
