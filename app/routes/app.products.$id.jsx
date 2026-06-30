@@ -346,7 +346,7 @@ export default function ProductTryOnManager() {
         setUploadProgress(10);
         const { url: uploadUrl, resourceUrl, parameters } = urlData;
 
-        await uploadDirectToShopify(uploadUrl, file, parameters, (pct) => {
+        await uploadDirectToShopify(uploadUrl, parameters, file, urlData, (pct) => {
           // Map 10-80% range for the actual upload
           setUploadProgress(10 + Math.round(pct * 0.7));
         });
@@ -746,7 +746,7 @@ export default function ProductTryOnManager() {
 
 // ─── Upload directly to Shopify's CDN with XHR progress ──────────────────────
 
-function uploadDirectToShopify(url, file, parameters, onProgress) {
+function uploadDirectToShopify(url, parameters, file, data, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.upload.addEventListener("progress", (e) => {
@@ -765,22 +765,28 @@ function uploadDirectToShopify(url, file, parameters, onProgress) {
     });
     xhr.addEventListener("error", () => reject(new Error("Network error during upload to Shopify")));
     
-    // If parameters exist, it's a POST with FormData (S3/GCP style form upload)
-    if (parameters && parameters.length > 0) {
-      xhr.open("POST", url);
-      const formData = new FormData();
-      parameters.forEach((param) => {
-        formData.append(param.name, param.value);
-      });
-      formData.append("file", file);
-      xhr.send(formData);
-    } else {
-      // If no parameters, it's a direct PUT request of the raw file binary.
-      // CRITICAL: Content-Type must exactly match the mimeType sent to stagedUploadsCreate
-      // otherwise Google Cloud Storage rejects it with SignatureDoesNotMatch.
+    if (data.httpMethod === "PUT") {
       xhr.open("PUT", url);
+      // For PUT, parameters are usually headers required by the cloud provider
+      if (parameters) {
+        parameters.forEach((param) => {
+          xhr.setRequestHeader(param.name, param.value);
+        });
+      }
+      // CRITICAL: Must exactly match mimeType used in stagedUploadsCreate
       xhr.setRequestHeader("Content-Type", "model/gltf-binary");
       xhr.send(file);
+    } else {
+      // POST with FormData
+      xhr.open("POST", url);
+      const formData = new FormData();
+      if (parameters) {
+        parameters.forEach((param) => {
+          formData.append(param.name, param.value);
+        });
+      }
+      formData.append("file", file);
+      xhr.send(formData);
     }
   });
 }

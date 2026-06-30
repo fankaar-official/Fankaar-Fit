@@ -98,6 +98,7 @@ export const action = async ({ request }) => {
         url: target.url,
         resourceUrl: target.resourceUrl,
         parameters: target.parameters,
+        httpMethod: "PUT", // hardcode since we requested PUT
       });
     } catch (err) {
       console.error("Staged upload error:", err);
