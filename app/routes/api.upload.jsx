@@ -119,7 +119,7 @@ export const action = async ({ request }) => {
             {
               originalSource: resourceUrl,
               filename,
-              contentType: "MODEL_3D",
+              contentType: "FILE",
             },
           ],
         },
