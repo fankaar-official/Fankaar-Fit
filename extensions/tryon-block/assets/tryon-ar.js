@@ -314,8 +314,9 @@
             }
           });
 
-          // The raw GLB is loaded. We will apply all rotation at the wrapper level
-          // based on MediaPipe's 3D matrix.
+          // Apply a 180-degree rotation so the glasses face the correct direction
+          // because Shopify/Google Cloud doesn't rotate it for us anymore.
+          glasses.rotation.y = Math.PI;
 
           // CRITICAL: force-update the world matrix so Box3.setFromObject sees
           // the post-rotation extents, not the stale pre-rotation state.
